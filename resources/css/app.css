@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@plugin "daisyui";
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans:
+        "Instrument Sans", ui-sans-serif, system-ui, sans-serif,
+        "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+        "Noto Color Emoji";
+
+    --font-roboto:
+        "Roboto", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+        "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+@layer utilities {
+    /* Thin, Small Right Arrow (Expand) */
+    .cursor-expand {
+        cursor:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 32 32' stroke-width='1.2' stroke='black'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M18 10l6 6m0 0l-6 6m6-6H8' /%3E%3C/svg%3E")
+                16 16,
+            auto;
+    }
+
+    /* Thin, Small Left Arrow (Collapse) */
+    .cursor-collapse {
+        cursor:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 32 32' stroke-width='1.2' stroke='black'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M14 22l-6-6m0 0l6-6m-6 6h16' /%3E%3C/svg%3E")
+                16 16,
+            auto;
+    }
+
+    /* --- DARK MODE (White Stroke) --- */
+    /* .dark class is usually on the <html> tag */
+    :where(.dark) .cursor-expand {
+        cursor:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 32 32' stroke-width='1.5' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M18 10l6 6m0 0l-6 6m6-6H8' /%3E%3C/svg%3E")
+                16 16,
+            auto;
+    }
+
+    :where(.dark) .cursor-collapse {
+        cursor:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 32 32' stroke-width='1.5' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M14 22l-6-6m0 0l6-6m-6 6h16' /%3E%3C/svg%3E")
+                16 16,
+            auto;
+    }
+}
+
+@layer components {
+    /* 1. Ensure the tooltip is high enough to sit above other content */
+    .tooltip {
+        @apply z-[100];
+    }
+
+    /* 2. Prevent the sidebar from cutting off the tooltip */
+    /* This targets the sidebar when it is in its collapsed state */
+    .sm\:w-17,
+    aside {
+        overflow: visible !important;
+    }
+
+    /* 3. If you need the navigation area to scroll, do it here */
+    /* We allow Y scrolling but keep X visible so tooltips can pop out */
+    nav {
+        @apply overflow-y-auto overflow-x-visible;
+    }
+
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar {
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none; /* Firefox */
+    }
+}
