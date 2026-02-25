@@ -16,11 +16,12 @@ new class extends Component
 ?>
 
 <div class="breadcrumbs text-xs">
+    @php $totalItems = count($items); @endphp
     <ul>
         @foreach ($items as $item)
             <li>
-                @if ($loop->last || !isset($item['url']))
-                    <span class="text-base-content/60 ">{{ $item['label'] }}</span>
+                @if ($loop->last || $totalItems === 1 || empty($item['url']))
+                    <span class="text-base-content/60" @if($loop->last) aria-current="page"@endif>{{ $item['label'] }}</span>
                 @else
                     <a href="{{ $item['url'] ?? '#' }}">{{ $item['label'] }}</a>
                 @endif
