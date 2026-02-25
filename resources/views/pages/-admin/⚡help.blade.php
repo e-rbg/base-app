@@ -10,6 +10,6 @@ new #[Layout('layouts.app')] #[Title('Help')] class extends Component
 };
 ?>
 
-<div>
-    Help Page
+<div class="text-2xl">
+    Help
 </div>

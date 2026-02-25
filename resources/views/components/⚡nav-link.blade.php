@@ -8,8 +8,8 @@ new class extends \Livewire\Component
     public $url = '#';
     public $label = '';
     public $icon = '';
-    public $activeClass = 'text-base-900 font-semibold';
-    public $baseClass = 'flex items-center rounded transition-colors p-2 h-6 hover:text-base-900';
+    public $activeClass = 'text-primary font-semibold';
+    public $baseClass = 'flex items-center rounded transition-colors p-2 h-6 hover:text-base-900 hover:text-secondary hover:font-medium';
     public $tooltipClass = ' tooltip tooltip-right ';
     public $forceShowLabel = false;
 
@@ -31,13 +31,13 @@ new class extends \Livewire\Component
     wire:navigate
     @click.stop
     x-data="{ 
-        isDesktop: window.innerWidth >= 768,
+        {{-- isDesktop: window.innerWidth >= 768, --}}
         forceShow: @js($forceShowLabel == true),
-        init() {
+        {{-- init() {
             window.addEventListener('resize', () => {
                 this.isDesktop = window.innerWidth >= 768;
             });
-        }
+        } --}}
     }"
     
     {{ $attributes->merge(['class' => $this->isActive() ? "$baseClass $activeClass" : $baseClass ]) }}

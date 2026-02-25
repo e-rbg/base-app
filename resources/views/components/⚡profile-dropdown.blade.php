@@ -10,8 +10,20 @@ new class extends Component
 
 
     <!-- Profie Dropdown -->
-<div @click.away="openProfile = false" x-cloak x-show="openProfile" class="bg-base-200 dark:bg-base-900 flex items-start flex-col absolute sm:w-58 py-5 px-2 bottom-10  text-sm z-100 transition-all duration-300 rounded-lg shadow-lg">
-    <div class="w-full">
+<div 
+    @click.away="openProfile = false" 
+    x-cloak
+    x-transition:enter="transition ease-out duration-300 transform"
+        x-transition:enter-start="translate-y-full opacity-0"
+        x-transition:enter-end="translate-y-0 opacity-100"
+
+        x-transition:leave="transition ease-in duration-200 transform"
+        x-transition:leave-start="translate-y-0 opacity-100"
+        x-transition:leave-end="translate-y-full opacity-0"
+    x-show="openProfile" 
+    class="flex items-start flex-col absolute sm:w-58 px-2 bottom-10 text-sm z-100 transition-all duration-300 rounded-lg shadow-lg"
+>
+    <div class="rounded-lg flex flex-col p-2 space-y-3 bg-base-100 dark:bg-base-100 w-full shadow-lg">
         <livewire:nav-link
             url="admin.user-profile" 
             label="User Profile" 
@@ -23,7 +35,7 @@ new class extends Component
             label="Logout"
             icon='<path fill-rule="evenodd" d="M17 4.25A2.25 2.25 0 0 0 14.75 2h-5.5A2.25 2.25 0 0 0 7 4.25v2a.75.75 0 0 0 1.5 0v-2a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 .75.75v11.5a.75.75 0 0 1-.75.75h-5.5a.75.75 0 0 1-.75-.75v-2a.75.75 0 0 0-1.5 0v2A2.25 2.25 0 0 0 9.25 18h5.5A2.25 2.25 0 0 0 17 15.75V4.25Z" clip-rule="evenodd" />
                 <path fill-rule="evenodd" d="M1 10a.75.75 0 0 1 .75-.75h9.546l-1.048-.943a.75.75 0 1 1 1.004-1.114l2.5 2.25a.75.75 0 0 1 0 1.114l-2.5 2.25a.75.75 0 1 1-1.004-1.114l1.048-.943H1.75A.75.75 0 0 1 .9999,10Z" clip-rule="evenodd" />'
-            class="border-t border-gray-300 mt-4 pt-5"                          
+            class=""                          
             :forceShowLabel="true"
         />
         {{-- <div class="flex items-center space-x-2 border-t border-gray-300 mt-2 pt-2 cursor-pointer text-gray-500 hover:text-gray-900 px-5">

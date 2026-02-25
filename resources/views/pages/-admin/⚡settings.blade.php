@@ -10,7 +10,7 @@ new #[Layout('layouts.app')] #[Title('Admin Settings')] class extends Component
 };
 ?>
 
-<div>
+<div class="text-2xl">
     Settings
     <div class="">
         <div class="px-3 py-2">

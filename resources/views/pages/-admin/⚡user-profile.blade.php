@@ -10,6 +10,6 @@ new #[Layout('layouts.app')] #[Title('User Profile')] class extends Component
 };
 ?>
 
-<div>
-    User Profile
+<div class="text-2xl">
+    Profile
 </div>

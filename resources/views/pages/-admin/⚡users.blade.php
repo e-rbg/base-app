@@ -10,6 +10,6 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
 };
 ?>
 
-<div>
+<div class="text-2xl">
     Users
 </div>

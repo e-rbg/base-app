@@ -15,7 +15,7 @@ new class extends Component
         x-cloak
         @mouseenter="isHovered = true"
         @mouseleave="isHovered = false"
-        class="transition-all duration-300 sm:flex sm:flex-col justify-between relative hidden overflow-x-hidden scrollbar-hidden"
+        class="transition-all duration-300 sm:flex sm:flex-col justify-between relative hidden overflow-x-hidden scrollbar-hidden "
         :class="{
             'sm:w-17 cursor-expand': collapse,
             'sm:w-60': !collapse
@@ -57,6 +57,11 @@ new class extends Component
         <div class="flex flex-col space-y-2">
             <nav x-cloak class="overflow-x-hidden flex flex-col p-2 z-50">
                 <livewire:nav-link
+                    url="admin.users" 
+                    label="Users" 
+                    icon='<path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />'
+                />
+                <livewire:nav-link
                     url="admin.settings" 
                     label="Settings" 
                     icon='<path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/>'
@@ -72,12 +77,12 @@ new class extends Component
             <div
                 x-data="{openProfile: false}"
                 
-                class="overflow-x-hidden flex flex-col p-2 font-roboto" 
+                class="overflow-x-hidden flex flex-col py-2" 
                 data-tip="Profile"
                 @click="openProfile = !openProfile"
                 @click.stop="collapse && isDesktop" 
             >
-                <div class="flex items-center">   
+                <div class="flex items-center rounded-lg cursor-pointer">   
                     <livewire:avatar
                         label="User Profile"
                     />
