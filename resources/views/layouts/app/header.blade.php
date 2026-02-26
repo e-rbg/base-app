@@ -42,13 +42,9 @@
         @include('partials.head')
     </head>
     <body class="h-full overflow-hidden bg-base-100 antialiased">
-        
-        <x-dialog z-index="z-150" blur="sm" />
-        <x-notifications />
-        
         <div class="flex h-screen w-full overflow-hidden">
             <!-- Desktop View Sidebar-->
-            <livewire:desktop-view-sidebar />
+            <livewire:desktop-view-sidebar/>
             <!-- Main Content : at the right -->
             <main class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                 <!-- Mobile View Sidebar : Hidden on Desktop View-->

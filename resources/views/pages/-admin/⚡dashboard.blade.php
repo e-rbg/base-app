@@ -37,11 +37,10 @@ new #[Layout('layouts.app')] #[Title('Admin Dashboard')] class extends Component
             </label>
         </div>
     </div>
-
+    <!-- Main Content Area -->
     <div class="flex-1 min-h-0 overflow-y-auto p-5">
         <div class="max-w-full border border-primary p-6">
-            <p>Lorem Ipsum (Long Text)...</p>
+            <p class="text-primary">Lorem Ipsum (Long Text)...</p>
         </div>
     </div>
-
 </div>

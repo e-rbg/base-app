@@ -42,24 +42,11 @@
         @include('partials.head')
     </head>
     <body class="h-full overflow-hidden bg-base-100 antialiased">
-        
-        <x-dialog z-index="z-150" blur="sm" />
-        <x-notifications />
-        
+        <x-notifications z-index="z-50" /> {{-- Add this! --}}
         <div class="flex h-screen w-full overflow-hidden">
-            <!-- Desktop View Sidebar-->
-            <livewire:desktop-view-sidebar />
-            <!-- Main Content : at the right -->
-            <main class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                <!-- Mobile View Sidebar : Hidden on Desktop View-->
-                <div x-data="{ open:false }" class="md:hidden flex-shrink-0">
-                    <livewire:header-view-profile />
-                    <livewire:mobile-view-sidebar />
-                </div>
-                <div class="flex-1 flex flex-col min-h-0 mt-14 sm:mt-0 overflow-hidden">
-                    {{ $slot }}
-                </div>
-            </main>
+            <div class="flex-1 flex flex-col min-h-0 mt-14 sm:mt-0 overflow-hidden">
+                {{ $slot }}
+            </div>
         </div>
         @livewireScripts
     </body>
