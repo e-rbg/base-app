@@ -118,8 +118,7 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
 
             <x-card title="Public Profile" shadow="none" class="border border-base-200">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <x-input label="First Name" wire:model="first_name" placeholder="John" />
-                    <x-input label="Last Name" wire:model="last_name" placeholder="Doe" />
+                    <x-input label="Full Name" wire:model="name" placeholder="" />
                     <x-input label="Email Address" wire:model="email" icon="envelope" mini />
                     <x-native-select
                         label="Timezone"
