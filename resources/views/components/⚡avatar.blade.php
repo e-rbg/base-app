@@ -14,7 +14,7 @@ new class extends \Livewire\Component
 ?>
 
 <div
-    x-data="{ 
+    x-data="{
         isDesktop: window.innerWidth >= 768,
         init() {
             window.addEventListener('resize', () => {
@@ -25,27 +25,27 @@ new class extends \Livewire\Component
     :class="(isDesktop && collapse) ? ' justify-center ' : ' overflow-x-hidden'"
     class="h-10 flex items-center space-x-10 px-3 justify-between max-w-full cursor-pointer hover:text-base-900"
 >
-    <div class="flex items-center space-x-2 w-2/3 pl-2">    
+    <div class="flex items-center space-x-2 w-2/3 pl-2">
         <div
             :class="isDesktop && collapse ? '{{ $tooltipClass }}' : ''"
-            class="flex items-center justify-center flex-shrink-0 size-7 whitespace-nowrap text-sm"
+            class="flex items-center justify-center shrink-0 size-7 whitespace-nowrap text-sm"
             data-tip="User Profile"
         >
             @if($image)
-                    {!! $image !!} 
+                    {!! $image !!}
             @else
                 <img class="rounded-full" src="https://img.daisyui.com/images/profile/demo/distracted1@192.webp" />
             @endif
         </div>
-        <span 
+        <span
             class="whitespace-nowrap text-sm font-medium"
-            x-cloak 
+            x-cloak
             x-show="!isDesktop || (isDesktop && !collapse)"
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="opacity-0"
             x-transition:enter-end="opacity-100"
         >
-            {{ $label }}
+            {{ auth()->user()->name }}
         </span>
     </div>
     <div x-show="isDesktop && !collapse" class="w-1/3 flex items-end">
