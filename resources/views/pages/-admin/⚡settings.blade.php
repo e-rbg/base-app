@@ -4,45 +4,85 @@ use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 
+
 new #[Layout('layouts.app')] #[Title('Admin Settings')] class extends Component
 {
-    //
+    
+    use \WireUi\Traits\Actions;
+
+    public function updateTheme(string $theme)
+    {
+        auth()->user()->profile->update([
+            'preferences->theme' => $theme,
+        ]);
+
+        $this->dispatch('theme-updated', theme: $theme);
+
+        // Optional: Let the user know it saved
+        $this->notification()->success(
+            title: 'Appearance Updated',
+            description: "You are now using {$theme} mode."
+        );
+    }
 };
 ?>
 
-<div class="text-2xl">
-    Settings
-    <div class="">
-        <div class="px-3 py-2">
-            <button 
-                @click="toggleTheme()" 
-                class="flex items-center w-full h-10 px-2 rounded-lg transition-colors hover:bg-base-200 text-base-content/70 hover:text-base-content"
-            >
-                <div class="flex items-center justify-center flex-shrink-0 size-6">
-                    <svg x-show="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m0 13.5V21m8.966-8.966h-2.25M4.113 12.049H1.863m2.723-8.146l1.591 1.591m12.932 12.932l1.591 1.591m0-16.114l-1.591 1.591M6.437 17.563l-1.591 1.591M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-                    </svg>
-                    
-                    <svg x-show="theme === 'light'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
-                    </svg>
+<x-main-container 
+    title="Settings" 
+    :breadcrumbs="[
+        ['url' => route('admin.dashboard'), 'label' => 'Dashboard'],
+        ['label' => 'Settings']
+    ]"
+    wire:model.live.debounce.300ms="search"
+>
+    <div class="grid grid-cols-1 gap-6">
+        <div class="py-2">
+            <div class="card bg-base-200 border border-base-300 shadow-sm overflow-hidden sm:w-1/4 w-full py-2 px-3">
+                <div class="p-4 space-y-4">
+                    {{-- Heading Section --}}
+                    <div>
+                        <h3 class="text-sm font-bold text-base-content tracking-tight">Theme Selector</h3>
+                        <p class="text-[11px] text-base-content/50 font-medium leading-none mt-1">Switch to your desired theme.</p>
+                    </div>
+
+                    {{-- Interactive Toggle Button --}}
+                    <button 
+                        {{-- We call the backend, which then triggers the frontend via the event --}}
+                        @click="$wire.updateTheme(theme === 'light' ? 'dark' : 'light')" 
+                        class="group relative flex items-center justify-between w-full p-2 rounded-lg bg-base-200/50 hover:bg-base-200 transition-all duration-200 active:scale-[0.97] border border-transparent hover:border-base-300"
+                    >
+                        <div class="flex items-center gap-3">
+                            {{-- Animated Icon --}}
+                            <div class="flex items-center justify-center size-8 rounded-md bg-base-100 shadow-sm border border-base-300/30 text-primary">
+                                <x-icon 
+                                    x-show="theme === 'dark'" 
+                                    name="sun" 
+                                    class="size-5 animate-in zoom-in duration-300" 
+                                    x-cloak 
+                                />
+                                <x-icon 
+                                    x-show="theme === 'light'" 
+                                    name="moon" 
+                                    class="size-5 animate-in zoom-in duration-300" 
+                                    x-cloak 
+                                />
+                            </div>
+                            
+                            <span class="text-xs font-semibold text-base-content/80 text-secondary" x-text="theme === 'light' ? 'Dark Mode' : 'Light Mode'"></span>
+                        </div>
+
+                        {{-- Status Indicator --}}
+                        <div class="flex items-center">
+                            <div class="h-1.5 w-1.5 rounded-full bg-primary animate-pulse mr-2"></div>
+                            <span class="text-[10px] font-bold uppercase tracking-tighter opacity-40" x-text="theme"></span>
+                        </div>
+                    </button>
+                    <x-button  @click="localStorage.removeItem('theme'); location.reload();">
+                        Use System Settings
+                    </x-button>
                 </div>
-
-                <span 
-                     
-                    x-cloak
-                    class="ml-4 text-sm font-medium"
-                >
-                    <span x-text="theme === 'light' ? 'Dark Mode' : 'Light Mode'"></span>
-                </span>
-            </button>
+            </div>
+            
         </div>
-
     </div>
-    <button 
-        @click="localStorage.removeItem('theme'); location.reload();" 
-        class="btn btn-xs btn-outline"
-    >
-        Follow System Settings
-    </button>
-</div>
+</x-main-container>

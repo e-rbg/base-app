@@ -10,6 +10,35 @@ new class extends \Livewire\Component
     public $baseClass = 'flex items-center rounded transition-colors duration-300 p-2 h-6 ';
     public $tooltipClass = ' tooltip tooltip-right absolute';
 
+    public function with(): array
+    {
+        $user = auth()->user();
+
+        // 1. Handle the case where the user isn't logged in or has no profile yet
+        if (!$user || !$user->profile) {
+            return ['displayName' => 'Guest'];
+        }
+
+        $profile = $user->profile;
+
+        // 2. Extract initials from dedicated columns
+        $fInitial = strtoupper(substr($profile->first_name, 0, 1));
+        
+        // 3. Handle middle initial only if it exists
+        $mInitial = $profile->middle_name 
+            ? strtoupper(substr($profile->middle_name, 0, 1)) 
+            : '';
+
+        // 4. Combine into your elegant format: "BJDB Makatigbas"
+        $displayName = "{$fInitial}{$mInitial} {$profile->last_name}";
+
+        return [
+            'displayName' => $displayName,
+        ];
+    }
+
+    
+
 };
 ?>
 
@@ -45,7 +74,7 @@ new class extends \Livewire\Component
             x-transition:enter-start="opacity-0"
             x-transition:enter-end="opacity-100"
         >
-            {{ auth()->user()->name }}
+            {{ $displayName }}
         </span>
     </div>
     <div x-show="isDesktop && !collapse" class="w-1/3 flex items-end">

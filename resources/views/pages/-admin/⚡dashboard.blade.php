@@ -10,39 +10,16 @@ new #[Layout('layouts.app')] #[Title('Admin Dashboard')] class extends Component
 };
 ?>
 
-<div class="flex flex-col h-screen w-full bg-base-100 overflow-hidden">
-    <div class="shrink-0 z-20 bg-base-100/80 backdrop-blur-md border-b border-base-200">
-        <div class="px-6 py-3">
-            <livewire:breadcrumbs :items="[
-                ['url' => route('admin.dashboard'), 'label' => 'Dashboard'],
-                ['label' => 'Testing']
-            ]"/>
-
-            <div class="flex items-center justify-between gap-4 py-3 mt-1">
-                <h1 class="text-xl font-semibold tracking-tight text-base-content shrink-0">Dashboard</h1>
-
-                <div class="flex-1 max-w-md" x-show="isDesktop">
-                    <label class="input input-bordered flex items-center gap-2 h-10 bg-base-200/50 border-none">
-                        <x-icon name="magnifying-glass" class="w-4 h-4 opacity-70" />
-                        <input
-                            type="search"
-                            x-on:keydown.window.cmd.k.prevent="$el.focus()"
-                            x-on:keydown.window.ctrl.k.prevent="$el.focus()"
-                            class="grow text-sm font-roboto"
-                            placeholder="Search anything..."
-                            wire:model='search'
-                        />
-                        <div class="flex gap-1 items-center opacity-50">
-                            <kbd class="kbd kbd-sm text-[10px]">⌘</kbd>
-                            <kbd class="kbd kbd-sm text-[10px]">K</kbd>
-                        </div>
-                    </label>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <main class="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+<x-main-container 
+    title="Dashboard" 
+    :breadcrumbs="[
+        ['url' => route('admin.dashboard'), 'label' => 'Dashboard'],
+        
+    ]"
+    wire:model.live.debounce.300ms="search"
+>
+    <div class="grid grid-cols-1 gap-6">
+        <!-- MAIN CONTENT HERE -->
         <div class="p-6 max-w-400 mx-auto space-y-10">
             <header class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div class="space-y-1">
@@ -172,8 +149,9 @@ new #[Layout('layouts.app')] #[Title('Admin Dashboard')] class extends Component
                 </div>
             </div>
         </div>
-    </main>
-</div>
+        <!-- MAIN CONTENT HERE -->
+    </div>
+</x-main-container>
 
 {{-- <script>
     document.addEventListener('keydown', (e) => {
@@ -195,3 +173,5 @@ new #[Layout('layouts.app')] #[Title('Admin Dashboard')] class extends Component
         }
     }, true); // The 'true' here uses the "Capture" phase to catch the key before the browser
 </script> --}}
+
+

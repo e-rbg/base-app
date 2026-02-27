@@ -16,14 +16,35 @@ new #[Layout('layouts.auth')] #[Title('Login')] class extends Component
 
     public function login()
     {
-        $credentials = $this->validate([
-            'email' => ['required', 'email'],
+        $this->validate([
+            'email' => ['required'], // renamed to 'login' conceptually
             'password' => ['required'],
         ]);
 
-        if (Auth::attempt($credentials, $this->remember)) {
+        // Check if input is email or username
+        $fieldType = filter_var($this->email, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        if (Auth::attempt([$fieldType => $this->email, 'password' => $this->password, 'status' => 'active'], $this->remember)) {
+            $user = Auth::user();
+
+            // Audit: Capture the login time and IP address
+            $user->update([
+                'last_login_at' => now(),
+                'last_login_ip' => request()->ip(),
+            ]);
+
             session()->regenerate();
             return $this->redirectIntended('/admin/dashboard', navigate: true);
+        }
+
+        // Handle case where user exists but is not 'active'
+        $userExists = \App\Models\User::where('email', $this->email)->first();
+        if ($userExists && $userExists->status !== 'active') {
+            $this->notification()->warning(
+                title: 'Account Restricted',
+                description: "Your account is currently {$userExists->status}. Please contact support."
+            );
+            return;
         }
 
         $this->notification()->error(

@@ -2,7 +2,8 @@
 <html :class="{ 'dark': theme === 'dark' }" class="h-full overflow-hidden"
     lang="{{ str_replace('_', '-', app()->getLocale()) }}"
     x-data="{ 
-        theme: localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+        {{-- theme: localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'), --}}
+        theme: localStorage.getItem('theme') || @js(auth()->user()->profile->preferences['theme'] ?? 'light'),
         isDesktop: window.innerWidth >= 768,
         
         init() {
@@ -16,6 +17,12 @@
 
             window.addEventListener('resize', () => {
                 this.isDesktop = window.innerWidth >= 768;
+            });
+
+            window.addEventListener('theme-updated', event => {
+                this.theme = event.detail.theme;
+                localStorage.setItem('theme', this.theme);
+                this.applyTheme();
             });
 
             this.applyTheme();

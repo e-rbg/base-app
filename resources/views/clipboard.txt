@@ -134,3 +134,197 @@ ORIGINAL DASHBOARD
         </div>
     </div>
 </div>
+
+=====================================================
+
+<div class="flex flex-col h-screen w-full bg-base-100 overflow-hidden">
+    <div class="shrink-0 z-20 bg-base-100/80 backdrop-blur-md border-b border-base-200">
+        <div class="px-6 shadow-lg">
+            <livewire:breadcrumbs :items="[
+                ['url' => route('admin.dashboard'), 'label' => 'Dashboard'],
+                ['label' => 'Testing']
+            ]"/>
+
+            <div class="flex items-center justify-between gap-4 mt-1">
+                <h1 class="text-xl font-semibold tracking-tight text-base-content shrink-0">Dashboard</h1>
+
+                <div class="flex-1 max-w-md" x-show="isDesktop">
+                    <label class="input input-bordered flex items-center gap-2 h-10 bg-base-200/50 border-none">
+                        <x-icon name="magnifying-glass" class="w-4 h-4 opacity-70" />
+                        <input
+                            type="search"
+                            x-on:keydown.window.cmd.k.prevent="$el.focus()"
+                            x-on:keydown.window.ctrl.k.prevent="$el.focus()"
+                            class="grow text-sm font-roboto"
+                            placeholder="Search anything..."
+                            wire:model='search'
+                        />
+                        <div class="flex gap-1 items-center opacity-50">
+                            <kbd class="kbd kbd-sm text-[10px]">⌘</kbd>
+                            <kbd class="kbd kbd-sm text-[10px]">K</kbd>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <main class="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+        <div class="p-6 max-w-400 mx-auto space-y-10">
+            {{ $slot }}
+        </div>
+    </main>
+</div>
+
+=====================================================
+Settings:::
+
+<div class="text-2xl">
+    Settings
+    <div class="">
+        <div class="px-3 py-2">
+            <button 
+                @click="toggleTheme()" 
+                class="flex items-center w-full h-10 px-2 rounded-lg transition-colors hover:bg-base-200 text-base-content/70 hover:text-base-content"
+            >
+                <div class="flex items-center justify-center flex-shrink-0 size-6">
+                    <svg x-show="theme === 'dark'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m0 13.5V21m8.966-8.966h-2.25M4.113 12.049H1.863m2.723-8.146l1.591 1.591m12.932 12.932l1.591 1.591m0-16.114l-1.591 1.591M6.437 17.563l-1.591 1.591M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+                    </svg>
+                    
+                    <svg x-show="theme === 'light'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+                    </svg>
+                </div>
+
+                <span 
+                     
+                    x-cloak
+                    class="ml-4 text-sm font-medium"
+                >
+                    <span x-text="theme === 'light' ? 'Dark Mode' : 'Light Mode'"></span>
+                </span>
+            </button>
+        </div>
+
+    </div>
+    <button 
+        @click="localStorage.removeItem('theme'); location.reload();" 
+        class="btn btn-xs btn-outline"
+    >
+        Follow System Settings
+    </button>
+</div>
+
+
+=================================================
+NEW REGISTRATION Component
+
+<?php
+
+use App\Models\User;
+use App\Models\UserProfile;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Livewire\Volt\Component;
+use Livewire\Attributes\Layout;
+use WireUi\Traits\WireUiActions;
+
+new #[Layout('layouts.auth')] class extends Component {
+    use WireUiActions;
+
+    // User Table Data
+    public string $username = '';
+    public string $email = '';
+    public string $password = '';
+    public string $password_confirmation = '';
+
+    // Profile Table Data
+    public string $first_name = '';
+    public string $middle_name = '';
+    public string $last_name = '';
+
+    public function register()
+    {
+        $this->validate([
+            'username'   => ['required', 'string', 'alpha_dash', 'max:20', 'unique:users'],
+            'email'      => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'password'   => ['required', 'string', 'min:8', 'confirmed'],
+            'first_name' => ['required', 'string', 'max:50'],
+            'last_name'  => ['required', 'string', 'max:50'],
+        ]);
+
+        try {
+            DB::transaction(function () {
+                // 1. Create the User (UUID is handled by the HasUuids trait)
+                $user = User::create([
+                    'username' => $this->username,
+                    'email'    => $this->email,
+                    'password' => Hash::make($this->password),
+                    'status'   => 'active',
+                ]);
+
+                // 2. Create the associated Profile
+                $user->profile()->create([
+                    'first_name'  => $this->first_name,
+                    'middle_name' => $this->middle_name,
+                    'last_name'   => $this->last_name,
+                    'timezone'    => 'UTC', // You can detect this via JS later
+                ]);
+
+                Auth::login($user);
+            });
+
+            return $this->redirectIntended('/admin/dashboard', navigate: true);
+
+        } catch (\Exception $e) {
+            $this->notification()->error(
+                title: 'Registration Error',
+                description: 'Something went wrong while creating your account.'
+            );
+        }
+    }
+}; ?>
+
+<div class="min-h-screen flex items-center justify-center bg-base-200 px-4 py-12">
+    <div class="card w-full max-w-xl bg-base-100 shadow-2xl border border-base-300">
+        <div class="card-body p-8">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-black tracking-tight text-base-content">Create Account</h1>
+                <p class="text-sm opacity-60">Join our platform today</p>
+            </div>
+
+            <form wire:submit="register" class="space-y-4">
+                {{-- Row 1: Names --}}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <x-input label="First Name" wire:model="first_name" placeholder="John" />
+                    <x-input label="Middle Name" wire:model="middle_name" placeholder="D." />
+                    <x-input label="Last Name" wire:model="last_name" placeholder="Doe" />
+                </div>
+
+                {{-- Row 2: Account Details --}}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <x-input label="Username" icon="at-symbol" wire:model="username" placeholder="johndoe" />
+                    <x-input label="Email" icon="envelope" wire:model="email" placeholder="john@example.com" />
+                </div>
+
+                <hr class="border-base-300 my-2" />
+
+                {{-- Row 3: Passwords --}}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <x-password label="Password" wire:model="password" />
+                    <x-password label="Confirm Password" wire:model="password_confirmation" />
+                </div>
+
+                <div class="pt-4">
+                    <x-button type="submit" primary full lg label="Sign Up" spinner="register" />
+                </div>
+            </form>
+
+            <p class="mt-6 text-center text-sm opacity-60">
+                Already have an account? 
+                <a href="{{ route('login') }}" class="font-bold text-primary hover:underline" wire:navigate>Login here</a>
+            </p>
+        </div>
+    </div>
+</div>
