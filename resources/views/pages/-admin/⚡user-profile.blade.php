@@ -23,8 +23,12 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
     public string $username = '';
     public string $email = '';
     public string $timezone = 'UTC';
-    public $photo; // For temporary file upload
+    public string $theme = 'light'; // Added missing property
+    public $photo; 
     public ?string $enteredCode = null;
+    public string $current_password = '';
+    public string $new_password = '';
+    public string $new_password_confirmation = '';
 
     public function mount()
     {
@@ -36,6 +40,17 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
         $this->timezone    = $this->user->profile->timezone;
         $this->username    = $this->user->username ?? '';
         $this->email       = $this->user->email;
+        $this->theme       = $this->user->profile->preferences['theme'] ?? 'light';
+    }
+
+    public function updateTheme(string $theme) // Changed from variable to public function
+    {
+        $this->user->profile->update([
+            'preferences->theme' => $theme,
+        ]);
+
+        $this->theme = $theme;
+        $this->dispatch('theme-updated', theme: $theme);
     }
 
     public function updateGeneralInfo()
@@ -48,19 +63,15 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
             'timezone'   => 'required|string',
         ]);
 
-        // 1. CHECK IF EMAIL IS CHANGING
         if ($this->email !== $this->user->email) {
-            // Trigger the verification flow instead of saving to the main email column
             $this->requestEmailChange();
+            // Important: Reset the local email property to the OLD one 
+            // until the new one is actually verified.
+            $this->email = $this->user->email; 
         }
 
-        // 2. SAVE EVERYTHING ELSE
         DB::transaction(function () {
-            $this->user->update([
-                'username' => $this->username,
-                // REMOVE 'email' => $this->email from here! 
-                // We only want to save it to 'email' AFTER they verify the code.
-            ]);
+            $this->user->update(['username' => $this->username]);
 
             $this->user->profile->update([
                 'first_name'  => $this->first_name,
@@ -76,32 +87,13 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
     public function updatedPhoto()
     {
         $this->validate(['photo' => 'image|max:1024']);
-
         $path = $this->photo->store('avatars', 'public');
-        
-        // Match your schema column name 'avatar'
         $this->user->profile->update(['avatar' => $path]);
-
         $this->notification()->info('Avatar Changed', 'Your profile picture has been updated.');
-    }
-
-    $updateTheme = function (string $theme) {
-        // 1. Update the database through the profile relationship
-        $this->user->profile->update([
-            'preferences->theme' => $theme,
-        ]);
-
-        // 2. Update the local state so the UI reflects it
-        $this->theme = $theme;
-
-        // 3. Dispatch to the Alpine.js listener in your layout
-        $this->dispatch('theme-updated', theme: $theme);
     }
 
     public function requestEmailChange()
     {
-        $this->validate(['email' => "required|email|unique:users,email,{$this->user->id}"]);
-
         $code = (string) rand(100000, 999999);
 
         $this->user->update([
@@ -110,18 +102,16 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
             'verification_sent_at' => now(),
         ]);
 
-        // REAL EMAIL SENDING TRIGGERED HERE
         Mail::to($this->email)->send(new VerifyNewEmail($code));
 
         $this->user->refresh();
-        $this->notification()->success('Email Sent', 'Please check your inbox for the verification code.');
+        $this->notification()->success('Verification Sent', 'Check your new email inbox.');
     }
 
-    public function confirmEmailChange() // Added '?' and default null
+    public function confirmEmailChange()
     {
-        // 1. Guard against empty input
         if (empty($this->enteredCode)) {
-            $this->notification()->warning('Input Required', 'Please enter the 6-digit code.');
+            $this->addError('enteredCode', 'Please enter the code.');
             return;
         }
 
@@ -130,19 +120,61 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                 $this->user->forceFill([
                     'email' => $this->user->unverified_email,
                     'unverified_email' => null,
+                    'verification_code' => null, // Clear the code
                     'email_verified_at' => now(),
                 ])->save();
-                
-                $this->user->refresh();
             });
             
-            $this->notification()->success('Email Verified', 'Your login email has been updated.');
-            $this->email = $this->user->email; // Sync the local email property
+            $this->user->refresh();
+            $this->email = $this->user->email;
+            $this->enteredCode = null;
+            $this->notification()->success('Email Verified', 'Your account email has been updated.');
         } else {
             $this->notification()->error('Invalid Code', 'The code you entered is incorrect.');
         }
     }
 
+    public function updatePassword()
+    {
+        $this->validate([
+            'current_password' => ['required', 'current_password'], // Validates against auth user
+            'new_password'     => ['required', 'confirmed', Password::min(8)],
+        ]);
+
+        $this->user->update([
+            'password' => Hash::make($this->new_password),
+        ]);
+
+        $this->reset(['current_password', 'new_password', 'new_password_confirmation']);
+        
+        $this->notification()->success(
+            title: 'Password Updated',
+            description: 'Your security credentials have been changed successfully.'
+        );
+    }
+
+    /**
+     * Check if the general information has changed.
+     */
+    public function getIsDirtyProperty(): bool
+    {
+        return $this->first_name  !== ($this->user->profile->first_name ?? '') ||
+               $this->middle_name !== ($this->user->profile->middle_name ?? '') ||
+               $this->last_name   !== ($this->user->profile->last_name ?? '') ||
+               $this->username    !== ($this->user->username ?? '') ||
+               $this->email       !== ($this->user->email ?? '') ||
+               $this->timezone    !== ($this->user->profile->timezone ?? 'UTC');
+    }
+
+    /**
+     * Check if the password fields are ready to be submitted.
+     */
+    public function getCanUpdatePasswordProperty(): bool
+    {
+        return !empty($this->current_password) && 
+               strlen($this->new_password) >= 8 && 
+               $this->new_password === $this->new_password_confirmation;
+    }
 
 }; ?>
 
@@ -156,13 +188,13 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
 >
     <div class="grid grid-cols-1 gap-6">
         <!-- MAIN CONTENT -->
-        <div class="py-12 px-4">
+        <div class="py-5 px-4">
             <div class="space-y-10">
                 
                 {{-- Header Section --}}
-                <div class="flex items-center justify-between border-b border-base-200 pb-6">
+                <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="text-3xl font-black text-base-content tracking-tight">Account Settings</h1>
+                        <h1 class="sm:text-3xl text-lg font-black text-base-content tracking-tight">Account Settings</h1>
                         <p class="text-base-content/50">Manage your profile and security preferences.</p>
                     </div>
                     {{-- Status indicator based on your ENUM --}}
@@ -176,7 +208,7 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                     
                     {{-- Left: Sidebar/Avatar --}}
                     <div class="space-y-6">
-                        <div class="bg-base-100 border border-base-200 rounded-[2.5rem] p-8 text-center shadow-sm">
+                        <div class="bg-base-100 rounded-[2.5rem] p-8 text-center shadow-xl">
                             <div class="relative inline-block group">
                                 <x-avatar size="w-32 h-32" rounded="3xl"
                                     src="{{ $user->profile->avatar ? asset('storage/'.$user->profile->avatar) : 'https://ui-avatars.com/api/?name='.urlencode($user->initialed_name).'&background=random' }}"
@@ -187,7 +219,7 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                                     <input type="file" wire:model="photo" class="hidden" />
                                 </label>
                             </div>
-                            <h2 class="mt-4 font-black text-xl">{{ $user->fullname }}</h2>
+                            <h2 class="mt-4 font-bold font-roboto text-xl">{{ $user->fullname }}</h2>
                             <p class="text-xs opacity-40 font-bold tracking-widest mt-1"><span>@</span>{{ $user->username }}</p>
                         </div>
 
@@ -250,18 +282,19 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
 
                     {{-- Right: Profile Form --}}
                     <div class="lg:col-span-2 space-y-6">
+                        <h1 class="sm:text-xl text-lg font-black text-base-800 tracking-tight sm:uppercase mb-6">Manage your Profile</h1>
                         <x-card title="Personal Information" rounded="3xl" shadow="none" class="border-base-200 bg-base-100 dark:bg-base-300">
                             <form wire:submit="updateGeneralInfo" class="space-y-6">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <x-input label="First Name" wire:model="first_name" />
-                                    <x-input label="Last Name" wire:model="last_name" />
+                                    <x-input label="First Name" wire:model.live.blur="first_name" />
+                                    <x-input label="Last Name" wire:model.live.blur="last_name" />
                                 </div>
                                 
-                                <x-input label="Middle Name (Optional)" wire:model="middle_name" />
+                                <x-input label="Middle Name (Optional)" wire:model.live.blur="middle_name" />
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-base-200 pt-6 mt-6">
-                                    <x-input label="Username" prefix="@" wire:model="username" />
-                                    <x-input label="Email Address" icon="envelope" wire:model="email" />
+                                    <x-input label="Username" prefix="@" wire:model.live.blur="username" />
+                                    <x-input label="Email Address" icon="envelope" wire:model.live.blur="email" />
                                 </div>
 
                                 <x-select
@@ -271,21 +304,93 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                                     :options="['UTC', 'PST', 'Asia/Manila', 'EST', 'GMT']"
                                 />
 
-                                <div class="flex justify-end pt-4">
+                                {{-- <div class="flex justify-end pt-4">
                                     <x-button type="submit" primary label="Save All Changes" spinner="updateGeneralInfo" class="rounded-xl px-10" />
+                                </div> --}}
+                                <div class="flex justify-end pt-4">
+                                    <x-button 
+                                            type="submit" 
+                                            primary 
+                                            label="Save All Changes" 
+                                            spinner="updateGeneralInfo" 
+                                            class="rounded-xl px-10" 
+                                            :disabled="!$this->isDirty" 
+                                        />
                                 </div>
                             </form>
                         </x-card>
 
                         {{-- Theme Preferences (using the JSON column) --}}
-                        <x-card title="Preferences" rounded="3xl" shadow="none" class="border-base-200">
-                            <div class="flex items-center gap-4">
-                                <x-button flat secondary label="Light Mode" icon="sun" wire:click="updateTheme('light')" />
-                                <x-button flat secondary label="Dark Mode" icon="moon" wire:click="updateTheme('dark')" />
+                        <div class="mt-10 border-t border-error/20 pt-10">
+                            <h1 class="sm:text-xl font-black text-lg text-base-800 tracking-tight sm:uppercase mb-6">Manage your Theme</h1>
+                            {{-- Status Indicator --}}
+                            <x-card title="Preferences" rounded="3xl" shadow="none" class="border-base-200">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-tighter opacity-40 py-5">Current : </span>
+                                    <div class="h-2 w-2 rounded-full bg-primary animate-pulse mr-2"></div>
+                                    <span class="text-[10px] font-bold uppercase tracking-tighter opacity-40" x-text="theme"></span>
+                                </div>
+                                <div class="flex items-center gap-4">
+                                    <x-button outline interaction="positive" secondary label="Light Mode" icon="sun" wire:click="updateTheme('light')" />
+                                    <x-button solid secondary label="Dark Mode" icon="moon" wire:click="updateTheme('dark')" />
+                                    <x-button  @click="localStorage.removeItem('theme'); location.reload();">
+                                        Use System Settings
+                                    </x-button>
+                                </div>
+                            </x-card>
+                        </div>
+                        <div class="my-10 border-t border-error/20 pt-10">
+                            <h1 class="sm:text-xl text-lg font-black text-base-800 tracking-tight sm:uppercase mb-6">Security Credentials</h1>
+                            
+                            <div class="grid grid-cols-1 gap-6">
+                                {{-- Change Password Card --}}
+                                <x-card title="Change Password" rounded="3xl" shadow="none" class="border-base-200">
+                                    <form wire:submit="updatePassword" class="space-y-4">
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <x-password 
+                                                label="Current Password" 
+                                                wire:model.live.blur="current_password" 
+                                                placeholder="••••••••" 
+                                            />
+                                            <x-password 
+                                                label="New Password" 
+                                                wire:model.live.blur="new_password" 
+                                                placeholder="••••••••" 
+                                            />
+                                            <x-password 
+                                                label="Confirm New Password" 
+                                                wire:model.live.blur="new_password_confirmation" 
+                                                placeholder="••••••••" 
+                                            />
+                                        </div>
+                                        
+                                        <div class="flex justify-end mt-4">
+                                            <x-button 
+                                                type="submit" 
+                                                negative 
+                                                outline 
+                                                label="Update Password" 
+                                                spinner="updatePassword" 
+                                                class="rounded-xl px-8"
+                                                :disabled="!$this->canUpdatePassword"
+                                            />
+                                        </div>
+    
+                                    </form>
+                                </x-card>
+
+                                
+
+                                {{-- Optional: Delete Account Card --}}
+                                {{-- <div class="bg-error/5 border border-error/20 rounded-[2.5rem] p-8 flex items-center justify-between">
+                                    <div>
+                                        <h3 class="text-lg font-bold text-error">Delete Account</h3>
+                                        <p class="text-sm text-base-content/60">Once your account is deleted, all data will be permanently removed.</p>
+                                    </div>
+                                    <x-button label="Delete Account" red flat class="font-bold" />
+                                </div> --}}
                             </div>
-                        </x-card>
-                        <h1 class="text-2xl font-bold text-base-content tracking-tight">Danger Zone</h1>
-                              
+                        </div>     
                     </div>
                 </div>
             </div>

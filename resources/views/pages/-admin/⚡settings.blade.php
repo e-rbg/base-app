@@ -3,26 +3,26 @@
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
+use Livewire\WithFileUploads;
+use WireUi\Traits\WireUiActions;
 
 
 new #[Layout('layouts.app')] #[Title('Admin Settings')] class extends Component
 {
     
-    use \WireUi\Traits\Actions;
+    use WithFileUploads, WireUiActions;
 
     public function updateTheme(string $theme)
     {
-        auth()->user()->profile->update([
-            'preferences->theme' => $theme,
-        ]);
+        // Use updateOrCreate to be 100% safe
+        auth()->user()->profile()->updateOrCreate(
+            ['user_id' => auth()->id()],
+            ['preferences->theme' => $theme]
+        );
 
         $this->dispatch('theme-updated', theme: $theme);
-
-        // Optional: Let the user know it saved
-        $this->notification()->success(
-            title: 'Appearance Updated',
-            description: "You are now using {$theme} mode."
-        );
+        
+        $this->notification()->success("Theme updated to {$theme}!");
     }
 };
 ?>
@@ -68,7 +68,7 @@ new #[Layout('layouts.app')] #[Title('Admin Settings')] class extends Component
                                 />
                             </div>
                             
-                            <span class="text-xs font-semibold text-base-content/80 text-secondary" x-text="theme === 'light' ? 'Dark Mode' : 'Light Mode'"></span>
+                            <span class="text-xs font-semibold text-base-content/80" x-text="theme === 'light' ? 'Dark Mode' : 'Light Mode'"></span>
                         </div>
 
                         {{-- Status Indicator --}}

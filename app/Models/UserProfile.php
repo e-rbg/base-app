@@ -21,7 +21,7 @@ class UserProfile extends Model
      * The attributes that should be cast.
      */
     protected $casts = [
-        'preferences' => 'json', // Automatically handles JSON string to Array conversion
+        'preferences' => 'array', // Automatically handles JSON string to Array conversion
     ];
 
     /**

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use WireUi\Traits\WireUiActions;
+use Illuminate\Auth\Events\Registered;
 
 new #[Layout('layouts.auth', ['title' => 'Register'])] class extends Component {
     use WireUiActions;
@@ -33,9 +34,11 @@ new #[Layout('layouts.auth', ['title' => 'Register'])] class extends Component {
             'last_name'  => ['required', 'string', 'max:50'],
         ]);
 
+        // dd($this->first_name, $this->last_name, $this->username);
+
         try {
             DB::transaction(function () {
-                // 1. Create the User (UUID is handled by the HasUuids trait)
+                // 1. Create the User
                 $user = User::create([
                     'username' => $this->username,
                     'email'    => $this->email,
@@ -48,21 +51,35 @@ new #[Layout('layouts.auth', ['title' => 'Register'])] class extends Component {
                     'first_name'  => $this->first_name,
                     'middle_name' => $this->middle_name,
                     'last_name'   => $this->last_name,
-                    'timezone'    => 'UTC', // You can detect this via JS later
+                    'timezone'    => 'UTC',
+                    'preferences' => ['theme' => 'light', 'notifications' => true], // Set defaults here
                 ]);
+
+                // --- INSERTED HERE ---
+                // This event triggers Laravel's built-in email verification listener
+                event(new Registered($user));
 
                 Auth::login($user);
             });
 
+            // Since you have the 'verified' middleware, this redirect will 
+            // automatically send them to /email/verify first.
             return $this->redirectIntended('/admin/dashboard', navigate: true);
 
+        // } catch (\Exception $e) {
+        //     $this->notification()->error(
+        //         title: 'Registration Error',
+        //         description: 'Something went wrong while creating your account.'
+        //     );
+        // }
         } catch (\Exception $e) {
             $this->notification()->error(
                 title: 'Registration Error',
-                description: 'Something went wrong while creating your account.'
+                description: $e->getMessage() // This will tell you exactly what's wrong
             );
         }
     }
+
 }; ?>
 
 <div class="min-h-screen sm:flex sm:items-center items-start sm:pt-0 sm:justify-center bg-base-200 px-4">
