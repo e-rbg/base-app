@@ -21,6 +21,8 @@ Route::middleware(['auth', 'verified'])
         
         // Final URL: /admin/user-profile | Name: admin.user-profile
         Route::livewire('/user-profile', 'pages::-admin.user-profile')->name('user-profile');
+
+        Route::livewire('/travel-orders', 'pages::-admin.travel-orders')->name('travel-orders');
         
         // --- ADMIN & SUPER ADMIN ONLY ---
         Route::middleware(['can:access-admin-panels'])->group(function () {
@@ -32,7 +34,6 @@ Route::middleware(['auth', 'verified'])
             // Final URL: /admin/settings | Name: admin.settings
             Route::livewire('/settings', 'pages::-admin.settings')->name('settings');
         });
-
     });
 
 // Only guests can access these

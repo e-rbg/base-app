@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class UserProfile extends Model
 {
@@ -32,11 +33,20 @@ class UserProfile extends Model
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Helper to get the full name.
-     */
-    public function getFullNameAttribute(): string
+
+    public function fullName(): Attribute
     {
-        return trim("{$this->first_name} {$this->middle_name} {$this->last_name}");
+        return Attribute::make(
+            get: fn() => trim("{$this->first_name} {$this->middle_name} {$this->last_name}")
+        );
+    }
+
+    public function initials(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => strtoupper(substr($this->first_name,0,1))
+                        . ($this->middle_name? strtoupper(substr($this->middle_name,0,1)) : '')
+                        . " {$this->last_name}"
+        );
     }
 }

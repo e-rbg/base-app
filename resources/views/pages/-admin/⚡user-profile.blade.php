@@ -198,10 +198,13 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                         <p class="text-base-content/50">Manage your profile and security preferences.</p>
                     </div>
                     {{-- Status indicator based on your ENUM --}}
-                    <x-badge :color="$user->status === 'active' ? 'positive' : 'warning'" 
-                            label="{{ strtoupper($user->status) }}" 
-                            flat 
-                            class="font-bold" />
+                    <div class="flex items-center">
+                        <x-badge :color="$user->status === 'active' ? 'positive' : 'warning'" 
+                                label="{{ strtoupper($user->status) . ' : ' . strtoupper($user->role) }}" 
+                                flat 
+                                class="font-bold" />
+                        
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -219,7 +222,7 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                                     <input type="file" wire:model="photo" class="hidden" />
                                 </label>
                             </div>
-                            <h2 class="mt-4 font-bold font-roboto text-xl">{{ $user->fullname }}</h2>
+                            <h2 class="mt-4 font-bold font-roboto text-xl">{{ $user->full_name }}</h2>
                             <p class="text-xs opacity-40 font-bold tracking-widest mt-1"><span>@</span>{{ $user->username }}</p>
                         </div>
 
@@ -379,16 +382,6 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                                     </form>
                                 </x-card>
 
-                                
-
-                                {{-- Optional: Delete Account Card --}}
-                                {{-- <div class="bg-error/5 border border-error/20 rounded-[2.5rem] p-8 flex items-center justify-between">
-                                    <div>
-                                        <h3 class="text-lg font-bold text-error">Delete Account</h3>
-                                        <p class="text-sm text-base-content/60">Once your account is deleted, all data will be permanently removed.</p>
-                                    </div>
-                                    <x-button label="Delete Account" red flat class="font-bold" />
-                                </div> --}}
                             </div>
                         </div>     
                     </div>

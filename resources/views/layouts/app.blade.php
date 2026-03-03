@@ -2,4 +2,5 @@
     <div>
         {{ $slot }}
     </div>
+    <livewire:image-viewer />
 </x-layouts::app.sidebar>

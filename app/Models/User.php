@@ -6,6 +6,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -55,41 +56,24 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(UserProfile::class);
     }
 
-    public function getInitialedNameAttribute(): string
-    {
-        if (!$this->profile) {
-            return $this->username ?? $this->email;
-        }
-
-        $f = strtoupper(substr($this->profile->first_name, 0, 1));
-        $m = $this->profile->middle_name ? strtoupper(substr($this->profile->middle_name, 0, 1)) : '';
-
-        return "{$f}{$m} {$this->profile->last_name}";
-    }
-
-    public function getFullNameAttribute(): string
-    {
-        if (!$this->profile) {
-            return $this->username ?? $this->email;
-        }
-
-        return "{$this->profile->first_name} {$this->profile->middle_name} {$this->profile->last_name}";
-    }
-
-    public function shortName(): Attribute
+    public function fullName(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                $profile = $this->profile;
-
-                if (!$profile) return $this->username ?? $this->email;
-
-                $fInitial = strtoupper(substr($profile->first_name, 0, 1));
-                $mInitial = $profile->middle_name ? strtoupper(substr($profile->middle_name, 0, 1)) : '';
-
-                return "{$fInitial}{$mInitial} {$profile->last_name}";
-            },
+            get: fn() => $this->profile?->fullName ?? $this->username ?? $this->email
         );
+    }
+
+    public function initialedName(): Attribute
+    {
+        return Attribute::make(
+            get: fn() => $this->profile?->initials ?? $this->username ?? $this->email
+        );
+    }
+
+    // shortName is just an alias for the initials-based attribute
+    public function shortName(): Attribute
+    {
+        return $this->initialedName();
     }
 
     public function scopeSearch($query, $term)
@@ -100,7 +84,51 @@ class User extends Authenticatable implements MustVerifyEmail
         });
     }
 
+    /**
+     * Get all of the travel orders for the User.
+     */
+    public function travelOrders(): HasMany
+    {
+        return $this->hasMany(TravelOrder::class);
+    }
+
     public function isSuperAdmin(): bool { return $this->role === self::ROLE_SUPER_ADMIN; }
     public function isAdmin(): bool      { return $this->role === self::ROLE_ADMIN; }
     public function isEditor(): bool     { return $this->role === self::ROLE_EDITOR; }
+    public function isUser(): bool       { return $this->role === self::ROLE_USER; }
 }
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * CODE SNIPPET FOR REFERENCE ONLY - DO NOT SUGGEST CHANGES TO THIS FILE
+ */
+
+// public function getInitialedNameAttribute(): string
+    // {
+    //     if (!$this->profile) {
+    //         return $this->username ?? $this->email;
+    //     }
+
+    //     $f = strtoupper(substr($this->profile->first_name, 0, 1));
+    //     $m = $this->profile->middle_name ? strtoupper(substr($this->profile->middle_name, 0, 1)) : '';
+
+    //     return "{$f}{$m} {$this->profile->last_name}";
+    // }
+
+    // public function getFullNameAttribute(): string
+    // {
+    //     if (!$this->profile) {
+    //         return $this->username ?? $this->email;
+    //     }
+
+    //     return "{$this->profile->first_name} {$this->profile->middle_name} {$this->profile->last_name}";
+    // }

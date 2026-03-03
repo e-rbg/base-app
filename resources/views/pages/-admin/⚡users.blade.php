@@ -214,41 +214,29 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
                     @foreach($users as $user)
                         <tr class="group hover:bg-base-200/30 transition-colors">
                             <td class="py-5 pl-10">
-                                <div class="flex items-center gap-4 relative">
-                                    <div class="cursor-zoom-in hover:scale-110 transition-transform" 
-                                        wire:click="viewAvatar('{{ $user->profile?->avatar ? asset('storage/' . $user->profile->avatar) : 'https://ui-avatars.com/api/?name=' . urlencode($user->fullname) . '&background=random' }}')">
+                                <div class="flex items-center gap-4">
+                                    @php
+                                        $avatarUrl = $user->profile?->avatar 
+                                            ? asset('storage/' . $user->profile->avatar) 
+                                            : 'https://ui-avatars.com/api/?name=' . urlencode($user->fullname) . '&background=random';
+                                    @endphp
+
+                                    {{-- Trigger: Dispatches event to the Global SFC --}}
+                                    <div class="cursor-zoom-in hover:scale-110 transition-transform active:scale-95"
+                                        @click="$dispatch('preview-image', { url: '{{ $avatarUrl }}', title: '{{ $user->fullname }}' })">
+                                        
                                         <x-avatar 
                                             size="w-10 h-10" 
                                             rounded="lg" 
-                                            src="{{ $user->profile?->avatar ? asset('storage/' . $user->profile->avatar) : 'https://ui-avatars.com/api/?name=' . urlencode($user->fullname) . '&background=random' }}" 
+                                            :src="$avatarUrl" 
                                         />
                                     </div>
-                                    <!-- Avatar Modal -->
-                                    <x-modal wire:model.defer="showAvatarModal" align="center" z-index="z-500" max-width="md">
-                                        <x-card title="Profile Photo" rounded="3xl" z-index="z-600">
-                                            <div class="flex justify-center p-4 z-150">
-                                                @if($avatarUrl)
-                                                    <img src="{{ $avatarUrl }}"
-                                                        class="w-full h-auto rounded-2xl shadow-2xl border-4 border-base-200"
-                                                        alt="Avatar Preview">
-                                                @endif
-                                            </div>
 
-                                            <x-slot name="footer" class="flex justify-end gap-x-4">
-                                                <x-button flat label="Close" wire:click="closeAvatarModal" />
-                                                @if($avatarUrl && !str_contains($avatarUrl, 'ui-avatars.com'))
-                                                    <x-button primary label="Download" tag="a" href="{{ $avatarUrl }}" download />
-                                                @endif
-                                            </x-slot>
-                                        </x-card>
-                                    </x-modal>
-                                    <!-- End of Avatar Modal -->
                                     <div class="flex flex-col">
-                                        <span class="font-bold text-sm">{{ $user->fullname }}</span>
-                                        <span class="text-xs opacity-40">@ {{ $user->username }}</span>
+                                        <span class="font-bold text-sm leading-none">{{ $user->fullname }}</span>
+                                        <span class="text-xs opacity-40 mt-1">@ {{ $user->username }}</span>
                                     </div>
                                 </div>
-                            
                             </td>
                             <td>
                                 @php
@@ -282,10 +270,22 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
                 <div class="bg-base-100 border border-base-200 rounded-[2rem] p-5 shadow-sm active:bg-base-200/50 transition-all">
                     <div class="flex justify-between items-start">
                         <div class="flex items-center gap-4">
-                            <x-avatar size="w-14 h-14" rounded="2xl" 
-                                src="https://ui-avatars.com/api/?name={{ urlencode($user->fullname) }}&background=random" />
+                            @php
+                                $avatarUrl = $user->profile?->avatar 
+                                    ? asset('storage/' . $user->profile->avatar) 
+                                    : 'https://ui-avatars.com/api/?name=' . urlencode($user->fullname) . '&background=random';
+                            @endphp
+                            <div class="cursor-zoom-in hover:scale-110 transition-transform active:scale-95"
+                                @click="$dispatch('preview-image', { url: '{{ $avatarUrl }}', title: '{{ $user->fullname }}' })">
+                                
+                                <x-avatar 
+                                    size="w-10 h-10" 
+                                    rounded="lg" 
+                                    :src="$avatarUrl" 
+                                />
+                            </div>
                             <div class="flex flex-col">
-                                <span class="text-base font-black leading-tight text-base-content">{{ $user->fullname }}</span>
+                                <span class="text-base font-black leading-tight text-base-content">{{ $user->full_name }}</span>
                                 <span class="text-xs opacity-50 lowercase">{{ $user->email }}</span>
                                 
                                 {{-- Username & Status Row --}}
@@ -410,4 +410,8 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
             <x-button primary label="Save Account" wire:click="save" spinner="save" class="font-bold px-6" />
         </x-slot>
     </x-modal-card>
+
+    
+    
+    
 </x-main-container>

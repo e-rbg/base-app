@@ -20,18 +20,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Super Admin can do everything
         Gate::before(function ($user, $ability) {
             return $user->isSuperAdmin() ? true : null;
         });
 
-        // Specific permissions
         Gate::define('access-admin-panels', function (User $user) {
-            return in_array($user->role, ['super_admin', 'admin', 'editor']); // Admin and Editor can access admin panels, but only Super Admin can do everything.
+            return in_array($user->role, ['super_admin', 'admin', 'editor']); 
         });
 
         Gate::define('delete-content', function (User $user) {
-            return $user->role === 'super_admin'; // Only Admin can delete, Editor cannot.
+            return $user->role === 'super_admin';
         });
+
+        Gate::define('manage-users', fn(User $u) => in_array($u->role, [
+            User::ROLE_SUPER_ADMIN, User::ROLE_ADMIN,
+        ]));
     }
 }

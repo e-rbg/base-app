@@ -437,3 +437,208 @@ new #[Layout('layouts.auth')] #[Title('Create Account')] class extends Component
         </div>
     </div>
 </div>
+
+
+============================================================
+<?php
+
+namespace App\Livewire;
+
+use Livewire\Component;
+use Livewire\Attributes\On;
+
+class ImagePreviewModal extends Component
+{
+    public bool $show = false;
+    public string $url = '';
+    public string $title = 'Image Preview';
+
+    #[On('preview-image')] 
+    public function showImage($url, $title = 'Image Preview')
+    {
+        $this->url = $url;
+        $this->title = $title;
+        $this->show = true;
+    }
+}
+
+?>
+
+<template x-teleport="body">
+    <div 
+        x-show="$wire.show" 
+        x-cloak
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 backdrop-blur-0"
+        x-transition:enter-end="opacity-100 backdrop-blur-md"
+        class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/80"
+    >
+        <div 
+            @click.away="$wire.show = false" 
+            @keydown.window.escape="$wire.show = false"
+            class="w-full max-w-2xl transform transition-all"
+        >
+            <x-card :title="$title" rounded="3xl" shadow="2xl" class="overflow-hidden">
+                <div class="relative flex justify-center bg-base-200/50 rounded-2xl overflow-hidden min-h-[300px] group">
+                    {{-- The Image --}}
+                    <img :src="$wire.url" 
+                         class="max-w-full max-h-[75vh] object-contain shadow-sm transition-transform duration-500 hover:scale-105" 
+                         :alt="$title" />
+                    
+                    {{-- Subtle Overlay Gradient --}}
+                    <div class="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </div>
+
+                <x-slot name="footer">
+                    <div class="flex justify-between items-center w-full">
+                        <span class="text-xs text-gray-400 font-mono truncate max-w-[200px]" x-text="$wire.url"></span>
+                        
+                        <div class="flex gap-x-3">
+                            <x-button flat label="Close" @click="$wire.show = false" />
+                            <x-button primary 
+                                      icon="arrow-down-tray" 
+                                      label="Download" 
+                                      tag="a" 
+                                      :href="$wire.url" 
+                                      download />
+                        </div>
+                    </div>
+                </x-slot>
+            </x-card>
+        </div>
+    </div>
+</template>
+
+
+{{-- // USAGE:
+// <img 
+//     src="{{ $product->image_path }}" 
+//     class="cursor-pointer"
+// @click="$dispatch('preview-image', { url: '{{ $product->image_path }}', title: '{{ $product->name }}' })"
+// /> --}}
+
+{{-- // <x-avatar 
+//     size="w-10 h-10" 
+//     class="cursor-zoom-in"
+//     src="{{ $avatarUrl }}"
+//     @click="$dispatch('preview-image', { url: '{{ $avatarUrl }}', title: '{{ $user->fullname }}' })"
+// /> --}}
+
+{{-- // REGISTER: --}}
+{{-- // <livewire:image-preview-modal /> --}}
+
+{{-- AVATAR MODAL: TEMPLATE || TELEPORT --}}
+    {{-- <template x-teleport="body">
+        <div 
+            x-show="$wire.showAvatarModal" 
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+            x-cloak
+        >
+            {{-- Modal Content --}}
+            {{-- <div @click.away="$wire.set('showAvatarModal', false)" 
+                class="w-full max-w-md transform transition-all">
+                
+                <x-card title="Profile Photo" rounded="3xl" shadow="2xl">
+                    <div class="flex justify-center p-4">
+                        {{-- Use a loading spinner for a better feel --}}
+                        {{-- <div wire:loading wire:target="showAvatarModal">
+                            <x-icon name="arrow-path" class="w-10 h-10 animate-spin text-primary" />
+                        </div>
+                        
+                        <div wire:loading.remove wire:target="showAvatarModal">
+                            @if($avatarUrl)
+                                <img src="{{ $avatarUrl }}" 
+                                    class="w-full h-auto rounded-2xl shadow-2xl border-4 border-base-200 object-cover max-h-[70vh]" 
+                                    alt="Avatar Preview">
+                            @endif
+                        </div>
+                    </div>
+
+                    <x-slot name="footer" class="flex justify-end gap-x-4">
+                        <x-button flat label="Close" @click="$wire.set('showAvatarModal', false)" />
+                        
+                        @if($avatarUrl && !str_contains($avatarUrl, 'ui-avatars.com'))
+                            <x-button primary label="Download" tag="a" href="{{ $avatarUrl }}" download />
+                        @endif
+                    </x-slot>
+                </x-card> --}}
+            {{-- </div> --}}
+        {{-- </div> --}}
+    {{-- </template> --}}
+
+=========================================
+WORKING AVATAR Preview
+
+<td class="py-5 pl-10">
+                                <div class="flex items-center gap-4">
+                                    <!-- AVATAR PREVIEW TRIGGER : MODAL IS AT THE BOTTOM IN TEMPLATE FORM -->
+                                    <div 
+                                        class="cursor-zoom-in hover:scale-110 transition-transform"
+                                        @click="$wire.set('avatarUrl', '{{ $user->profile?->avatar ? asset('storage/' . $user->profile->avatar) : 'https://ui-avatars.com/api/?name=' . urlencode($user->fullname) . '&background=random' }}'); $wire.set('showAvatarModal', true)"
+                                    >
+                                
+                                        <x-avatar 
+                                            size="w-10 h-10" 
+                                            rounded="lg" 
+                                            src="{{ $user->profile?->avatar ? asset('storage/' . $user->profile->avatar) : 'https://ui-avatars.com/api/?name=' . urlencode($user->fullname) . '&background=random' }}" 
+                                        />
+                                    </div>
+
+                                    <div class="flex flex-col">
+                                        <span class="font-bold text-sm">{{ $user->fullname }}</span>
+                                        <span class="text-xs opacity-40">@ {{ $user->username }}</span>
+                                    </div>
+                                </div>
+                            </td>
+
+{{-- AVATAR PREVIEW MODAL --}}
+    <template x-teleport="body">
+        <div 
+            x-show="$wire.showAvatarModal" 
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+            x-cloak
+        >
+            {{-- Modal Content --}}
+            <div @click.away="$wire.set('showAvatarModal', false)" 
+                class="w-full max-w-md transform transition-all">
+                
+                <x-card title="Profile Photo" rounded="3xl" shadow="2xl">
+                    <div class="flex justify-center p-4">
+                        {{-- Use a loading spinner for a better feel --}}
+                        <div wire:loading wire:target="showAvatarModal">
+                            <x-icon name="arrow-path" class="w-10 h-10 animate-spin text-primary" />
+                        </div>
+                        
+                        <div wire:loading.remove wire:target="showAvatarModal">
+                            @if($avatarUrl)
+                                <img src="{{ $avatarUrl }}" 
+                                    class="w-full h-auto rounded-2xl shadow-2xl border-4 border-base-200 object-cover max-h-[70vh]" 
+                                    alt="Avatar Preview">
+                            @endif
+                        </div>
+                    </div>
+
+                    <x-slot name="footer" class="flex justify-end gap-x-4">
+                        <x-button flat label="Close" @click="$wire.set('showAvatarModal', false)" />
+                        
+                        @if($avatarUrl && !str_contains($avatarUrl, 'ui-avatars.com'))
+                            <x-button primary label="Download" tag="a" href="{{ $avatarUrl }}" download />
+                        @endif
+                    </x-slot>
+                </x-card>
+            </div>
+        </div>
+    </template>
+

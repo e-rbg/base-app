@@ -21,6 +21,8 @@
         "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer utilities {
     /* Thin, Small Right Arrow (Expand) */
     .cursor-expand {

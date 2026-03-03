@@ -9,27 +9,15 @@ new class extends \Livewire\Component {
                 'label' => 'Dashboard',
                 'icon' => '<path d="M2 4.25A2.25 2.25 0 0 1 4.25 2h2.5A2.25 2.25 0 0 1 9 4.25v2.5A2.25 2.25 0 0 1 6.75 9h-2.5A2.25 2.25 0 0 1 2 6.75v-2.5ZM2 13.25A2.25 2.25 0 0 1 4.25 11h2.5A2.25 2.25 0 0 1 9 13.25v2.5A2.25 2.25 0 0 1 6.75 18h-2.5A2.25 2.25 0 0 1 2 15.75v-2.5ZM11 4.25A2.25 2.25 0 0 1 13.25 2h2.5A2.25 2.25 0 0 1 18 4.25v2.5A2.25 2.25 0 0 1 15.75 9h-2.5A2.25 2.25 0 0 1 11 6.75v-2.5ZM11 13.25A2.25 2.25 0 0 1 13.25 11h2.5A2.25 2.25 0 0 1 18 13.25v2.5A2.25 2.25 0 0 1 15.75 18h-2.5A2.25 2.25 0 0 1 11 15.75v-2.5Z" />'
             ],
+
+            [
+                'route' => 'admin.travel-orders',
+                'tooltip_text' => 'Travel Orders',
+                'label' => 'Travel Orders',
+                'icon' => '<path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.155.75.75 0 0 0 0-1.114A28.897 28.897 0 0 0 3.105 2.288Z" />',
+                'permission' => '' // Only show if user has this permission
+            ],
         ];
-
-        // // Admin & Super Admin Only: User Management
-        // if (Gate::allows('access-admin-panels')) {
-        //     $menu[] = [
-        //         'route' => 'admin.users',
-        //         'tooltip_text' => 'Manage Users',
-        //         'label' => 'Users',
-        //         'icon' => '<path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />'
-        //     ];
-        // }
-
-        // // Super Admin Only: System Settings or Logs
-        // if (Gate::allows('manage-system')) {
-        //     $menu[] = [
-        //         'route' => 'admin.settings',
-        //         'tooltip_text' => 'System Settings',
-        //         'label' => 'Settings',
-        //         'icon' => '<path fill-rule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 00-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 00-2.282.819l-.922 1.597a1.875 1.875 0 00.432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 000 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 00-.432 2.385l.922 1.597a1.875 1.875 0 002.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.116-.26.297-.348.344-.165.673-.356.985-.57.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 002.283-.819l.923-1.597a1.875 1.875 0 00-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 000-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 00-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 00-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 00-1.85-1.567h-1.844zM12 15a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />'
-        //     ];
-        // }
 
         return $menu;
     }
@@ -40,14 +28,29 @@ new class extends \Livewire\Component {
     class="flex-1 flex flex-col p-2 overflow-x-hidden z-50"
 >
     @foreach($this->menuItems() as $item)
-        <livewire:nav-link 
-            :url="$item['route']" 
-            :label="$item['label']" 
-            :icon="$item['icon']" 
-            :wire:key="'nav-'.$item['route']"
-            class=""
-            :tooltip="$item['tooltip_text']"
-        />
+        @php
+            $showItem = true;
+            
+            if (!empty($item['permission'])) {
+                // Check if it's a method on the User model (like isSuperAdmin)
+                if (method_exists(auth()->user(), $item['permission'])) {
+                    $showItem = auth()->user()->{$item['permission']}();
+                } else {
+                    // Otherwise, check via Laravel Gate/Policy
+                    $showItem = auth()->user()->can($item['permission']);
+                }
+            }
+        @endphp
+
+        @if($showItem)
+            <livewire:nav-link 
+                :url="$item['route']" 
+                :label="$item['label']" 
+                :icon="$item['icon']" 
+                :wire:key="'nav-'.$item['route']"
+                :tooltip="$item['tooltip_text']"
+            />
+        @endif
     @endforeach
 </nav>
 

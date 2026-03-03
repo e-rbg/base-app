@@ -1,11 +1,23 @@
 <?php
 
 use Livewire\Component;
+use Livewire\Attributes\Computed;
 
 new class extends Component
 {
-    //
+    // This allows you to use $this->isSuperAdmin in your Blade
+    #[Computed]
+    public function isSuperAdmin(): bool
+    {
+        return auth()->user()?->isSuperAdmin() ?? false;
+    }
+
+    public function isAdmin(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
 };
+
 ?>
 
 <div class="sm:hidden flex items-center justify-between p-4 fixed top-0 left-0 right-0 z-50 bg-base-100">
@@ -24,7 +36,20 @@ new class extends Component
                 class="flex items-center p-1 rounded-lg  justify-between space-x-2 flex-shrink-0 whitespace-nowrap text-sm z-150 tooltip tooltip-left w-15" 
                 data-tip="User Profile"
             >
-                <img class="rounded-full size-7 shadow-lg" src="https://img.daisyui.com/images/profile/demo/distracted1@192.webp" />
+                @php
+                    // Logic to get the avatar URL or fallback
+                    $avatarUrl = auth()->user()->profile?->avatar 
+                        ? asset('storage/' . auth()->user()->profile->avatar) 
+                        : 'https://ui-avatars.com/api/?name=' . urlencode(auth()->user()->fullname) . '&background=random';
+                @endphp
+
+                {{-- Simple Display Only --}}
+                <x-avatar 
+                    size="w-7 h-7" 
+                    rounded="full" 
+                    :src="$avatarUrl" 
+                    alt="{{ auth()->user()->fullname }}"
+                />
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                 </svg>
@@ -55,6 +80,14 @@ new class extends Component
                     icon='<path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd"/>'
                     :forceShowLabel="true"
                 />
+                @can('manage-users')
+                    <livewire:nav-link 
+                        url="admin.users" 
+                        label="Users" 
+                        icon='<path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />'
+                        :forceShowLabel="true"
+                    />
+                @endcan
                 <livewire:nav-link
                     url="admin.help" 
                     label="Help" 
