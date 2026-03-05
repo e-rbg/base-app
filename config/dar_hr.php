@@ -28,5 +28,24 @@ return [
         'Provincial Agrarian Reform Program Officer (PARPO) I'      => '25',
         'Provincial Agrarian Reform Program Officer (PARPO) II'     => '26',
         // Add the rest of your DAR positions here...
+    ],
+
+    'officers' => [
+        'OPARO'                   => ['name' => 'Zaldy A. Arenas, MDMG', 'pos' => 'PARPO II'],
+        'LTID'                    => ['name' => 'Zaldy A. Arenas, MDMG', 'pos' => 'Chief, LTID'],
+        'PBDD'                    => ['name' => 'Nancy S. Ramos', 'pos' => 'Chief, PBDD'],
+        'Administrative Division' => ['name' => 'Merlina T. Babatid, MExEd, MPA', 'pos' => 'Chief Admin Officer'],
+        'Legal Division'          => ['name' => 'Maryrose J. Zulueta', 'pos' => 'Attorney IV'],
+        'DARMO-Compostela'        => ['name' => 'Joseto Visaya', 'pos' => 'MARPO'],
+        'DARMO-Laak'              => ['name' => 'Avelino O. Tocmo', 'pos' => 'MARPO'],
+        'DARMO-Mabini'            => ['name' => 'Greg L. Clarin', 'pos' => 'MARPO'],
+        'DARMO-Maco'              => ['name' => 'Dandy B. Barulo', 'pos' => 'MARPO'],
+        'DARMO-Maragusan'         => ['name' => 'Eldaliza R. Angcon', 'pos' => 'MARPO'],
+        'DARMO-Mawab'             => ['name' => 'Anthony R. Fuerzas', 'pos' => 'OIC MARPO'],
+        'DARMO-Monkayo'           => ['name' => 'Noreen Nicolas', 'pos' => 'MARPO'],
+        'DARMO-Montevista'        => ['name' => 'Brenda D. Mangco', 'pos' => 'MARPO'],
+        'DARMO-Nabunturan'        => ['name' => 'Precy S. Manla', 'pos' => 'MARPO'],
+        'DARMO-New Bataan'        => ['name' => 'Ana A. Romanillos', 'pos' => 'MARPO'],
+        'DARMO-Pantukan'          => ['name' => 'Allan V. Manuales', 'pos' => 'MARPO'],
     ]
 ];

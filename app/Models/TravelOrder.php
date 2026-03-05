@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TravelOrder extends Model
 {
     use HasUuids;
+    use SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -26,14 +28,15 @@ class TravelOrder extends Model
         'report_to',
         'purpose_of_trip',
         'accommodation_type',
-        'approved_by',
+        'approved_by_name',
+        'approved_by_position',
         'fund_custodian',
         'recommending_approval',
         'status',
         'approved_at',
         'esignature_hash',
-    
-        
+
+
     ];
     protected $casts = [
         'purpose_of_trip' => 'array',

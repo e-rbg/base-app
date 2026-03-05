@@ -29,11 +29,14 @@ return new class extends Migration
             $table->json('purpose_of_trip');
             $table->string('accommodation_type');
             $table->string('recommending_approval')->nullable();
-            $table->string('approved_by');
+            $table->string('recommending_position')->nullable();
+            $table->string('approved_by_name');
+            $table->string('approved_by_position');
             $table->string('fund_custodian');
             $table->string('status')->default('pending');
             $table->dateTime('approved_at')->nullable();
             $table->string('esignature_hash')->nullable();
+            $table->softDeletes();
             $table->timestamps();
         });
     }
