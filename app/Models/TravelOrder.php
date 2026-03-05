@@ -19,6 +19,7 @@ class TravelOrder extends Model
         'station',
         'transportation_means',
         'vehicle_type',
+        'travel_type',
         'destination',
         'departure_date',
         'return_date',
@@ -26,7 +27,11 @@ class TravelOrder extends Model
         'purpose_of_trip',
         'accommodation_type',
         'approved_by',
-        'funds_available',
+        'fund_custodian',
+        'recommending_approval',
+        'status',
+        'approved_at',
+        'esignature_hash',
     
         
     ];

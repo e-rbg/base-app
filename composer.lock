@@ -6077,16 +6077,16 @@
         },
         {
             "name": "wireui/heroicons",
-            "version": "v2.9.0",
+            "version": "v2.9.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/wireui/heroicons.git",
-                "reference": "ccd2ab94293d6f231271c0847c1db34305313c6f"
+                "reference": "b318b8cbbfb3e3bea841c0eaf2ff9e0ab1b8ee5e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/wireui/heroicons/zipball/ccd2ab94293d6f231271c0847c1db34305313c6f",
-                "reference": "ccd2ab94293d6f231271c0847c1db34305313c6f",
+                "url": "https://api.github.com/repos/wireui/heroicons/zipball/b318b8cbbfb3e3bea841c0eaf2ff9e0ab1b8ee5e",
+                "reference": "b318b8cbbfb3e3bea841c0eaf2ff9e0ab1b8ee5e",
                 "shasum": ""
             },
             "require": {
@@ -6134,9 +6134,9 @@
             ],
             "support": {
                 "issues": "https://github.com/wireui/heroicons/issues",
-                "source": "https://github.com/wireui/heroicons/tree/v2.9.0"
+                "source": "https://github.com/wireui/heroicons/tree/v2.9.1"
             },
-            "time": "2025-03-02T22:06:22+00:00"
+            "time": "2026-03-04T13:02:21+00:00"
         },
         {
             "name": "wireui/wireui",

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('password');
             $table->enum('status', ['active', 'inactive', 'suspended'])->default('active');
-            $table->string('role')->default('user')->after('email');
+            $table->string('role')->default('user');
             
             // Audit & Security
             $table->timestamp('last_login_at')->nullable();

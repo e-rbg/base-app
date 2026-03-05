@@ -15,7 +15,8 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('user_id')->constrained()->cascadeOnDelete();
             $table->string('travel_order_no')->unique();
-            $table->date('date');
+            $table->string('travel_type');
+            $table->date('travel_date');
             $table->string('name');
             $table->string('position');
             $table->string('station');
@@ -25,10 +26,14 @@ return new class extends Migration
             $table->date('departure_date');
             $table->date('return_date');
             $table->string('report_to');
-            $table->json('purpose_of_trip'); // Stored as array
-            $table->enum('accommodation_type', ['live-in', 'live-out']);
+            $table->json('purpose_of_trip');
+            $table->string('accommodation_type');
+            $table->string('recommending_approval')->nullable();
             $table->string('approved_by');
             $table->string('fund_custodian');
+            $table->string('status')->default('pending');
+            $table->dateTime('approved_at')->nullable();
+            $table->string('esignature_hash')->nullable();
             $table->timestamps();
         });
     }
