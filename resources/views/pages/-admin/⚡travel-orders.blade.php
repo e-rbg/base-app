@@ -15,11 +15,14 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     // Form Fields
     public $travel_order_no, $travel_date, $name, $position, $station;
     public $transportation_means = 'Land';
-    public $vehicle_selection = 'government vehicle';
-    public $custom_vehicle = '';
+    
+    // SYNCED FIELDS
+    public $vehicle_type = 'Government Vehicle'; // Default to match PDF logic
+    public $vehicle_details = '';
+    
     public $destination, $departure_date, $return_date, $report_to;
     public $purpose_of_trip = [];
-    public $accommodation_type = 'live-out';
+    public $accommodation_type = 'Live-out'; // Capitalized to match PDF strict check
     public $approved_by_name;
     public $approved_by_position;
     public $fund_custodian ='Maria Siezamie B. Agoilo';
@@ -27,6 +30,15 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     public $recommending_approval = '';
     public $recommending_position = '';
     public bool $readOnly = false;
+    public $selectedOrder = null;
+
+    // Triggered when Vehicle Type changes (WireUI v2)
+    public function updatedVehicleType($value)
+    {
+        if ($value !== 'Others') {
+            $this->vehicle_details = ''; // Clear details if switched back to Govt
+        }
+    }
 
     #[Computed]
     public function travelOrders()
@@ -43,7 +55,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         return $query->where('user_id', $user->id)->latest()->paginate(10);
     }
 
-    protected function travelTypes(): array
+    protected function travelTypes(): array 
     {
         return [
             ['name' => 'Intra-Municipal (or within Official Station)',        'id' => 'intra_municipal'],
@@ -178,26 +190,34 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
 
     public function edit(TravelOrder $to)
     {
-        // If it's approved and NOT a super admin, force read-only
         $this->readOnly = ($to->status === 'approved' && !auth()->user()->isSuperAdmin());
-
         $this->editing = $to;
+        
+        // Fill all fields from the database
         $this->fill($to->toArray());
+        
+        // Ensure "Others" visibility logic works immediately upon opening
+        $this->vehicle_type = $to->vehicle_type === 'Government Vehicle' ? 'Government Vehicle' : 'Others';
+        
+        // If it was "Others", the actual value from the DB is stored in vehicle_type, 
+        // so we move it to details for the input field.
+        if ($this->vehicle_type === 'Others') {
+            $this->vehicle_details = $to->vehicle_type; 
+        }
+
         $this->purpose_of_trip = !empty($to->purpose_of_trip) ? $to->purpose_of_trip : [''];
         $this->modal = true;
     }
 
     public function save()
     {
-        // 1. Server-side Security Lock
         if ($this->editing && $this->editing->status === 'approved' && !auth()->user()->isSuperAdmin()) {
-            $this->notification()->error('Action Denied', 'This Travel Order is approved and locked.');
+            $this->notification()->error('Action Denied', 'This Travel Order is locked.');
             return;
         }
 
         $this->applyApprovalLogic();
 
-        // 1. Validate ALL fields. If it's not here, it won't be saved!
         $validated = $this->validate([
             'travel_order_no'       => 'required|unique:travel_orders,travel_order_no,' . ($this->editing?->id ?? 'NULL') . ',id',
             'travel_date'           => 'required|date',
@@ -208,30 +228,31 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             'destination'           => 'required|string',
             'departure_date'        => 'required|date',
             'return_date'           => 'required|date',
-            'report_to'             => 'nullable|string',
             'purpose_of_trip'       => 'required|array|min:1',
             'transportation_means'  => 'required|string',
             'accommodation_type'    => 'required|string',
             'recommending_approval' => 'required|string',
-            'recommending_position' => 'nullable|string',
             'approved_by_name'      => 'required|string',
             'approved_by_position'  => 'required|string',
             'fund_custodian'        => 'required|string',
+            'report_to'             => 'required|string',
         ]);
 
-        // 2. Add the custom vehicle logic to the validated data
-        $validated['vehicle_type'] = ($this->vehicle_selection === 'others')
-            ? $this->custom_vehicle
-            : 'government vehicle';
+        // SYNC LOGIC: If 'Others', save the specific details into the vehicle_type column
+        $finalVehicleValue = ($this->vehicle_type === 'Others') 
+            ? $this->vehicle_details 
+            : 'Government Vehicle';
+
+        $data = array_merge($validated, [
+            'vehicle_type' => $finalVehicleValue,
+            'user_id' => auth()->id()
+        ]);
 
         if ($this->editing) {
-            $this->editing->update($validated);
+            $this->editing->update($data);
             $this->notification()->success('Updated', 'Travel order updated.');
         } else {
-            // 3. Manually add the user_id since it's not in the form
-            $validated['user_id'] = auth()->id();
-
-            TravelOrder::create($validated);
+            TravelOrder::create($data);
             $this->notification()->success('Created', 'New travel order recorded.');
         }
 
@@ -377,6 +398,14 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         })->values()->toArray();
     }
 
+    public function openPrintModal($id)
+    {
+        $this->selectedOrder = \App\Models\TravelOrder::findOrFail($id);
+        
+        // This ensures the data is there BEFORE the modal appears
+        $this->dispatch('open-modal', 'print-modal'); 
+    }
+
 }; ?>
 
 <div class="p-6">
@@ -434,16 +463,6 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
 
                     {{-- 5. ACTIONS --}}
                     <td class="p-4 flex justify-center gap-2">
-                        {{-- 1. ALWAYS show View button --}}
-                        {{-- This bypasses Livewire and goes straight to the PDF Route --}}
-                        {{-- <x-button
-                            rounded
-                            icon="eye"
-                            primary
-                            href="{{ route('travel-order.print', $order->id) }}"
-                            target="_blank"
-                        /> --}}
-
                         {{-- 2. EDIT & DELETE: Only for the owner AND only if it's NOT approved --}}
                         @if($order->user_id === auth()->id() && $order->status !== 'approved')
                             <x-button rounded icon="pencil" wire:click="edit('{{ $order->id }}')" />
@@ -462,7 +481,14 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                                     params: '{{ $order->id }}'
                                 }"
                             />
-                        @endif
+                            <x-button 
+                                sm 
+                                icon="printer"
+                                label="Print"
+                                {{-- Only call the wire method. Let the method handle the dispatch --}}
+                                wire:click="openPrintModal({{ $order->id }})" 
+                            />
+                         @endif
 
                         {{-- 3. APPROVAL: Only for Signatories or Super Admin --}}
                         @if($order->status === 'pending')
@@ -490,6 +516,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         <div class="p-4">{{ $this->travelOrders->links() }}</div>
     </div>
 
+    <!-- CREATE / EDIT MODAL -->
     <x-modal-card title="Travel Order Form" wire:model="modal" class="w-full md:w-3/4" z-index="z-[500]" persistent>
         <div class="space-y-6"> {{-- Vertical spacing between sections --}}
 
@@ -545,22 +572,68 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                 </div>
             </div>
 
-            {{-- Section 3: Logistics & Purpose --}}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <x-native-select label="Transportation" wire:model="transportation_means" :options="['Land', 'Air', 'Sea']" />
-                <x-native-select label="Accommodation" wire:model="accommodation_type" :options="['Live-out', 'Live-in']" />
-                <x-input label="Report To" wire:model="report_to" />
+            {{-- Reports To Field --}}
+            <div class="md:col-span-3" >
+                <x-input 
+                    wire:model="report_to" 
+                    label="Report to:" 
+                    placeholder="e.g. Person of interest for travel"
+                    icon="user"
+                    :readonly="$readOnly"
+                />
             </div>
 
-            <div class="p-3 bg-orange-50 rounded-lg border border-orange-100">
-                <label class="text-xs font-bold uppercase mb-2 block text-orange-800">Vehicle Details</label>
-                <div class="flex gap-4 mb-2">
-                    <x-radio label="Government" value="government vehicle" wire:model.live="vehicle_selection" />
-                    <x-radio label="Other" value="others" wire:model.live="vehicle_selection" />
+            {{-- Section 3: Logistics & Purpose --}}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-orange-50/30 p-4 rounded-lg border border-orange-100">
+                
+                {{-- 1. Means of Trans --}}
+                <x-select
+                    label="Means of Transportation"
+                    placeholder="Select mode"
+                    wire:model.live="transportation_means" 
+                    :readonly="$readOnly"
+                >
+                    <x-select.option label="Air" value="Air" />
+                    <x-select.option label="Land" value="Land" />
+                    <x-select.option label="Sea" value="Sea" />
+                </x-select>
+
+                {{-- 2. Accommodation --}}
+                <x-select
+                    label="Accommodation"
+                    placeholder="Select type"
+                    wire:model.live="accommodation_type"
+                    :readonly="$readOnly"
+                >
+                    <x-select.option label="Live-in" value="Live-in" />
+                    <x-select.option label="Live-out" value="Live-out" />
+                    <x-select.option label="N/A" value="N/A" />
+                </x-select>
+
+                {{-- 3. Vehicle Ownership --}}
+                <x-select
+                    label="Vehicle Ownership"
+                    placeholder="Select ownership"
+                    wire:model.live="vehicle_type"
+                    :readonly="$readOnly"
+                >
+                    <x-select.option label="Government Vehicle" value="Government Vehicle" />
+                    <x-select.option label="Others (Specify...)" value="Others" />
+                </x-select>
+
+                {{-- Conditional Details Field --}}
+                <div class="md:col-span-3" wire:key="vehicle-details-area">
+                    @if($vehicle_type === 'Others')
+                        <x-input 
+                            wire:model="vehicle_details" 
+                            label="Vehicle Details" 
+                            placeholder="e.g. Public Utility Jeep, Rented Van"
+                            icon="truck"
+                            :readonly="$readOnly"
+                        />
+                    @endif
                 </div>
-                @if($vehicle_selection === 'others')
-                    <x-input placeholder="Specify vehicle..." wire:model="custom_vehicle" />
-                @endif
+                
             </div>
 
             {{-- Purpose Repeater --}}
@@ -579,7 +652,6 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                 @endforeach
             </div>
 
-            {{-- Section 4: Signatures (The Split Logic) --}}
             {{-- Section 4: Signatures --}}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6 bg-blue-50/50 p-4 rounded-lg">
                 {{-- Recommending --}}
@@ -598,17 +670,24 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
 
         <x-slot name="footer">
             <div class="flex justify-between w-full">
-                <div>
-                    @if($editing)
-                        <x-button
-                            xs
-                            outline
-                            icon="printer"
-                            label="Print"
-                            href="{{ route('travel-order.print', $order->id) }}"
-                            target="_blank"
-                        />
-                    @endif
+                <div class="flex gap-2">
+                    {{-- Option 1: View & Print (Opens in new tab) --}}
+                    <x-button 
+                        sm 
+                        icon="printer" 
+                        label="Print Preview" 
+                        href="{{ route('print-travel-order', $order->id) }}" 
+                        target="_blank" 
+                    />
+
+                    {{-- Option 2: Direct PDF Download --}}
+                    <x-button 
+                        sm 
+                        secondary
+                        icon="folder-arrow-down" 
+                        label="Download PDF" 
+                        href="{{ route('travel-order.pdf', $order->id) }}?download=1" 
+                    />
                 </div>
                 <div class="flex gap-x-4">
                     <x-button flat label="Cancel" x-on:click="close" />
@@ -619,4 +698,6 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             </div>
         </x-slot>
     </x-modal-card>
+    <!-- END OF CREATE / EDIT MODAL -->
+
 </div>
