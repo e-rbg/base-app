@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use EdeesonOpina\PsgcApi\Models\Barangay;
 
 class TravelOrder extends Model
 {
@@ -32,6 +33,7 @@ class TravelOrder extends Model
         'approved_by_position',
         'fund_custodian',
         'recommending_approval',
+        'recommending_position',
         'status',
         'approved_at',
         'esignature_hash',
@@ -40,7 +42,6 @@ class TravelOrder extends Model
     ];
     protected $casts = [
         'purpose_of_trip' => 'array',
-        'destination' => 'array',
         'accommodation_type' => 'array',
         'vehicle_type' => 'array',
         'travel_date' => 'date',
@@ -54,6 +55,30 @@ class TravelOrder extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Format destination as "Barangay, Municipality, Davao de Oro"
+     */
+    public function formattedDestination(): string
+    {
+        if (empty($this->destination)) {
+            return '';
+        }
+
+        // Look up the barangay in PSGC data
+        $barangay = Barangay::query()
+            ->join('city_municipalities', 'barangays.city_municipality_id', '=', 'city_municipalities.id')
+            ->where('barangays.province_id', 58) // Davao de Oro
+            ->whereRaw('LOWER(barangays.name) = ?', [strtolower($this->destination)])
+            ->first(['barangays.name', 'city_municipalities.name as municipality_name']);
+
+        if ($barangay) {
+            return "{$barangay->name}, {$barangay->municipality_name}, Davao de Oro";
+        }
+
+        // Fallback for free-text entries (regional/national destinations)
+        return $this->destination;
     }
 }
 

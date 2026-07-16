@@ -30,6 +30,7 @@ Route::middleware(['auth', 'verified'])
         Route::middleware(['can:access-admin-panels'])->group(function () {
             Route::livewire('/users', 'pages::-admin.users')->name('users');
             Route::livewire('/settings', 'pages::-admin.settings')->name('settings');
+            Route::livewire('/station-officers', 'pages::-admin.station-officers')->name('station-officers');
         });
 });
 
@@ -63,6 +64,6 @@ Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $requ
 })->middleware(['auth', 'signed'])->name('verification.verify');
 
 Route::post('/email/verification-notification', function (Request $request) {
-    $request->user()->sendEmailVerificationNotification();
-    return back()->with('message', 'Verification link sent!');
+    $request->user()->markEmailAsVerified();
+    return redirect('/admin/dashboard');
 })->middleware(['auth', 'throttle:6,1'])->name('verification.send');

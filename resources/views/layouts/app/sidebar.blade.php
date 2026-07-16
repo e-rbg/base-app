@@ -63,7 +63,7 @@
                     <livewire:header-view-profile />
                     <livewire:mobile-view-sidebar />
                 </div>
-                <div class="flex-1 flex flex-col min-h-0 mt-14 sm:mt-0 overflow-hidden">
+                <div class="flex-1 flex flex-col min-h-0 mt-14 sm:mt-0 overflow-y-auto">
                     {{ $slot }}
                 </div>
             </main>

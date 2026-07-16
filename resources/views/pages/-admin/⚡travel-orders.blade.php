@@ -1,6 +1,10 @@
 <?php
 
+use App\Models\StationOfficer;
 use App\Models\TravelOrder;
+use EdeesonOpina\PsgcApi\Models\Barangay;
+use EdeesonOpina\PsgcApi\Models\CityMunicipality;
+use EdeesonOpina\PsgcApi\Models\Province;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -30,7 +34,6 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     public $recommending_approval = '';
     public $recommending_position = '';
     public bool $readOnly = false;
-    public $selectedOrder = null;
 
     // Triggered when Vehicle Type changes (WireUI v2)
     public function updatedVehicleType($value)
@@ -61,7 +64,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             ['name' => 'Intra-Municipal (or within Official Station)',        'id' => 'intra_municipal'],
             ['name' => 'Extra-Municipal (Within Davao de Oro)',               'id' => 'extra_municipal'],
             ['name' => 'Regional (Within Davao Region)',                      'id' => 'regional'],
-            ['name' => 'National (Outside Region)',                           'id' => 'national'],
+            ['name' => 'National (Outside Region)',                           'id' => 'national', 'disabled' => true],
         ];
     }
 
@@ -85,24 +88,13 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     #[Computed]
     public function stationOfficers(): array
     {
-        return [
-            'OPARO'                   => ['name' => 'Zaldy A. Arenas, MDMG', 'pos' => 'PARPO II'],
-            'LTID'                    => ['name' => 'Greg L. Clarin', 'pos' => 'Chief, LTID'],
-            'PBDD'                    => ['name' => 'Nancy S. Ramos', 'pos' => 'Chief, PBDD'],
-            'Administrative Division' => ['name' => 'Merlina T. Babatid, MExEd, MPA', 'pos' => 'Chief Admin Officer'],
-            'Legal Division'          => ['name' => 'Maryrose J. Zulueta', 'pos' => 'Attorney IV'],
-            'DARMO-Compostela'        => ['name' => 'Joseto Visaya', 'pos' => 'MARPO'],
-            'DARMO-Laak'              => ['name' => 'Avelino O. Tocmo', 'pos' => 'MARPO'],
-            'DARMO-Mabini'            => ['name' => 'Greg L. Clarin', 'pos' => 'MARPO'],
-            'DARMO-Maco'              => ['name' => 'Dandy B. Barulo', 'pos' => 'MARPO'],
-            'DARMO-Maragusan'         => ['name' => 'Eldaliza R. Angcon', 'pos' => 'MARPO'],
-            'DARMO-Mawab'             => ['name' => 'Anthony R. Fuerzas', 'pos' => 'OIC MARPO'],
-            'DARMO-Monkayo'           => ['name' => 'Noreen Nicolas', 'pos' => 'MARPO'],
-            'DARMO-Montevista'        => ['name' => 'Brenda D. Mangco', 'pos' => 'MARPO'],
-            'DARMO-Nabunturan'        => ['name' => 'Precy S. Manla', 'pos' => 'MARPO'],
-            'DARMO-New Bataan'        => ['name' => 'Ana A. Romanillos', 'pos' => 'MARPO'],
-            'DARMO-Pantukan'          => ['name' => 'Allan V. Manuales', 'pos' => 'MARPO'],
-        ];
+        return StationOfficer::ordered()
+            ->get()
+            ->pluck('officer_name', 'station_code')
+            ->mapWithKeys(fn($name, $code) => [
+                $code => ['name' => $name, 'pos' => StationOfficer::where('station_code', $code)->value('position')],
+            ])
+            ->toArray();
     }
 
     public function updatedStation($value)
@@ -114,6 +106,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
 
     public function updatedTravelType($value)
     {
+        $this->destination = '';
         $this->applyApprovalLogic();
     }
 
@@ -130,12 +123,14 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $parpoName = "Zaldy A. Arenas, MDMG";
         $parpoPos  = "PARPO II";
 
+        // Approved By is always the station officer
+        $this->approved_by_name = $data['name'];
+        $this->approved_by_position = $data['pos'];
+
         // Scenario A: User is in the Provincial Office (OPARO)
         if ($this->station === 'OPARO') {
             $this->recommending_approval = 'N/A';
             $this->recommending_position = '---';
-            $this->approved_by_name = $parpoName;
-            $this->approved_by_position = $parpoPos;
             return;
         }
 
@@ -145,8 +140,6 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                 // Within town: MARPO is the final authority
                 $this->recommending_approval = 'N/A';
                 $this->recommending_position = '---';
-                $this->approved_by_name = $data['name'];
-                $this->approved_by_position = $data['pos'];
             } else {
                 // Outside town: MARPO recommends, PARPO approves
                 $this->recommending_approval = $data['name'];
@@ -245,6 +238,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
 
         $data = array_merge($validated, [
             'vehicle_type' => $finalVehicleValue,
+            'recommending_position' => $this->recommending_position,
             'user_id' => auth()->id()
         ]);
 
@@ -305,29 +299,121 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $this->notification()->warning('Archived', 'Order moved to trash.');
     }
 
-    #[Computed]
     public function destinations(): array
     {
-        $barangays = config('davao_de_oro.barangays') ?? [];
-
-        // Map the array to include a searchable label
-        $formatted = array_map(function($b) {
-            return [
-                'name'       => $b['name'],
-                'municipality' => $b['municipality'],
-                'full_label' => "{$b['name']} - {$b['municipality']}" // The magic string
-            ];
-        }, $barangays);
+        // Map headquarters offices to Nabunturan (their municipality)
+        $stationMunicipalityMap = [
+            'OPARO'                   => 'Nabunturan',
+            'LTID'                    => 'Nabunturan',
+            'PBDD'                    => 'Nabunturan',
+            'Administrative Division' => 'Nabunturan',
+            'Legal Division'          => 'Nabunturan',
+        ];
 
         if ($this->travel_type === 'intra_municipal') {
-            $currentTown = str_replace('DARMO-', '', $this->station);
-            return array_values(array_filter($formatted, fn($b) =>
-                strtolower($b['municipality']) === strtolower($currentTown)
-            ));
+            $currentTown = $stationMunicipalityMap[$this->station] ?? str_replace('DARMO-', '', $this->station);
+
+            $barangays = Barangay::query()
+                ->join('city_municipalities', 'barangays.city_municipality_id', '=', 'city_municipalities.id')
+                ->where('barangays.province_id', 58) // Davao de Oro
+                ->where('city_municipalities.name', $currentTown)
+                ->where('city_municipalities.province_id', 58) // Ensure correct Mabini
+                ->orderBy('barangays.name')
+                ->get(['barangays.name', 'city_municipalities.name as municipality_name'])
+                ->map(fn($b) => [
+                    'name'        => $b->name,
+                    'municipality' => $b->municipality_name,
+                    'full_label'  => "{$b->name}, {$b->municipality_name}, Davao de Oro",
+                ])
+                ->toArray();
+
+            return $barangays;
         }
 
         if ($this->travel_type === 'extra_municipal') {
-            return array_values($formatted);
+            $barangays = Barangay::query()
+                ->join('city_municipalities', 'barangays.city_municipality_id', '=', 'city_municipalities.id')
+                ->where('barangays.province_id', 58) // Davao de Oro
+                ->orderBy('city_municipalities.name')
+                ->orderBy('barangays.name')
+                ->get(['barangays.name', 'city_municipalities.name as municipality_name'])
+                ->map(fn($b) => [
+                    'name'        => $b->name,
+                    'municipality' => $b->municipality_name,
+                    'full_label'  => "{$b->name}, {$b->municipality_name}, Davao de Oro",
+                ])
+                ->toArray();
+
+            return $barangays;
+        }
+
+        if ($this->travel_type === 'regional') {
+            // Get the region and province of the selected station (scoped to Davao de Oro)
+            $currentTown = $stationMunicipalityMap[$this->station] ?? str_replace('DARMO-', '', $this->station);
+
+            $station = CityMunicipality::query()
+                ->where('name', $currentTown)
+                ->where('province_id', 58) // Davao de Oro
+                ->first(['province_id', 'region_id']);
+
+            if (!$station) {
+                return [];
+            }
+
+            // Get all barangays in the same region, excluding the station's province
+            $destinations = Barangay::query()
+                ->join('city_municipalities', 'barangays.city_municipality_id', '=', 'city_municipalities.id')
+                ->join('provinces', 'city_municipalities.province_id', '=', 'provinces.id')
+                ->where('city_municipalities.region_id', $station->region_id)
+                ->where('city_municipalities.province_id', '!=', $station->province_id)
+                ->orderBy('provinces.name')
+                ->orderBy('city_municipalities.name')
+                ->orderBy('barangays.name')
+                ->get(['barangays.name', 'city_municipalities.name as municipality_name', 'provinces.name as province_name'])
+                ->map(fn($b) => [
+                    'name'        => $b->name,
+                    'municipality' => $b->municipality_name,
+                    'full_label'  => $b->municipality_name !== $b->province_name
+                        ? "{$b->name}, {$b->municipality_name}, {$b->province_name}"
+                        : "{$b->name}, {$b->municipality_name}",
+                ])
+                ->toArray();
+
+            return $destinations;
+        }
+
+        if ($this->travel_type === 'national') {
+            // Get the region of the selected station (scoped to Davao de Oro)
+            $currentTown = $stationMunicipalityMap[$this->station] ?? str_replace('DARMO-', '', $this->station);
+
+            $stationRegionId = CityMunicipality::query()
+                ->where('name', $currentTown)
+                ->where('province_id', 58) // Davao de Oro
+                ->value('region_id');
+
+            if (!$stationRegionId) {
+                return [];
+            }
+
+            // Get all barangays across all provinces, excluding the station's region
+            $destinations = Barangay::query()
+                ->join('city_municipalities', 'barangays.city_municipality_id', '=', 'city_municipalities.id')
+                ->join('provinces', 'city_municipalities.province_id', '=', 'provinces.id')
+                ->where('city_municipalities.region_id', '!=', $stationRegionId)
+                ->orderBy('provinces.name')
+                ->orderBy('city_municipalities.name')
+                ->orderBy('barangays.name')
+                ->get(['barangays.name', 'city_municipalities.name as municipality_name', 'provinces.name as province_name'])
+                ->map(fn($b) => [
+                    'name'        => $b->name,
+                    'municipality' => $b->municipality_name,
+                    'full_label'  => $b->municipality_name !== $b->province_name
+                        ? "{$b->name}, {$b->municipality_name}, {$b->province_name}"
+                        : "{$b->name}, {$b->municipality_name}",
+                ])
+                ->toArray();
+
+            return $destinations;
         }
 
         return [];
@@ -398,14 +484,6 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         })->values()->toArray();
     }
 
-    public function openPrintModal($id)
-    {
-        $this->selectedOrder = \App\Models\TravelOrder::findOrFail($id);
-        
-        // This ensures the data is there BEFORE the modal appears
-        $this->dispatch('open-modal', 'print-modal'); 
-    }
-
 }; ?>
 
 <div class="p-6">
@@ -459,7 +537,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                     </td>
 
                     {{-- 4. DESTINATION --}}
-                    <td class="p-4">{{ $order->destination }}</td>
+                    <td class="p-4">{{ $order->formattedDestination() }}</td>
 
                     {{-- 5. ACTIONS --}}
                     <td class="p-4 flex justify-center gap-2">
@@ -485,8 +563,8 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                                 sm 
                                 icon="printer"
                                 label="Print"
-                                {{-- Only call the wire method. Let the method handle the dispatch --}}
-                                wire:click="openPrintModal({{ $order->id }})" 
+                                href="{{ route('admin.print-travel-order', $order->id) }}"
+                                target="_blank"
                             />
                          @endif
 
@@ -560,10 +638,8 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                     <x-select label="Scope of Travel" wire:model.live="travel_type" :options="$this->travelTypes()" option-label="name" option-value="id" searchable />
 
                     <div class="md:col-span-2">
-                        @if(in_array($travel_type, ['intra_municipal', 'extra_municipal']))
-                            <x-select label="Destination (Barangay)" placeholder="Search Barangay..." wire:model="destination" :options="$this->destinations()" option-label="full_label" option-value="name" searchable />
-                        @else
-                            <x-input label="Destination (City/Province)" placeholder="e.g. Manila" wire:model="destination" icon="map-pin" />
+                        @if(in_array($travel_type, ['intra_municipal', 'extra_municipal', 'regional', 'national']))
+                            <x-select label="Destination" placeholder="Search destination..." wire:model="destination" :options="$this->destinations()" option-label="full_label" option-value="name" searchable />
                         @endif
                     </div>
 
@@ -655,10 +731,12 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             {{-- Section 4: Signatures --}}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-6 bg-blue-50/50 p-4 rounded-lg">
                 {{-- Recommending --}}
+                @if(!empty($recommending_approval) && $recommending_approval !== 'N/A')
                 <div class="space-y-2">
                     <x-input label="Recommending Approval" wire:model="recommending_approval" readonly />
                     <x-input label="Position" wire:model="recommending_position" readonly class="text-xs bg-gray-50 italic" />
                 </div>
+                @endif
 
                 {{-- Approved By (Synced to DB names) --}}
                 <div class="space-y-2">
@@ -671,23 +749,15 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         <x-slot name="footer">
             <div class="flex justify-between w-full">
                 <div class="flex gap-2">
-                    {{-- Option 1: View & Print (Opens in new tab) --}}
-                    <x-button 
-                        sm 
-                        icon="printer" 
-                        label="Print Preview" 
-                        href="{{ route('print-travel-order', $order->id) }}" 
-                        target="_blank" 
-                    />
-
-                    {{-- Option 2: Direct PDF Download --}}
-                    <x-button 
-                        sm 
-                        secondary
-                        icon="folder-arrow-down" 
-                        label="Download PDF" 
-                        href="{{ route('travel-order.pdf', $order->id) }}?download=1" 
-                    />
+                    @if($this->editing)
+                        <x-button 
+                            sm 
+                            icon="printer" 
+                            label="Print Preview" 
+                            href="{{ route('admin.print-travel-order', $this->editing->id) }}" 
+                            target="_blank" 
+                        />
+                    @endif
                 </div>
                 <div class="flex gap-x-4">
                     <x-button flat label="Cancel" x-on:click="close" />

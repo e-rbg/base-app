@@ -11,15 +11,18 @@
     "require": {
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.1",
+        "edeesonopina/laravel-psgc-api": "^1.1",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^4.1",
+        "spatie/browsershot": "^5.4",
+        "spatie/laravel-pdf": "^2.12",
         "wireui/wireui": "^2.5"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
         "fruitcake/laravel-debugbar": "^4.0",
-        "laravel/boost": "2.0",
+        "laravel/boost": "^2.1",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.24",
         "laravel/sail": "^1.41",

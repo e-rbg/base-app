@@ -4,7 +4,7 @@
             
             {{-- Action Bar: Hidden during print --}}
             <div class="flex justify-between items-center mb-6 px-4 print:hidden">
-                <x-button flat icon="arrow-left" label="Back to List" href="{{ route('travel-orders.pdf') }}" />
+                <x-button flat icon="arrow-left" label="Back to List" href="{{ route('admin.travel-orders') }}" />
                 <x-button primary icon="printer" label="Print Travel Order" onclick="window.print()" />
             </div>
 
