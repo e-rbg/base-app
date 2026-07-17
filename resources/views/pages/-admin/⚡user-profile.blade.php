@@ -29,6 +29,8 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
     public string $current_password = '';
     public string $new_password = '';
     public string $new_password_confirmation = '';
+    public string $secret_code_input = '';
+    public string $confirm_secret_code = '';
 
     public function mount()
     {
@@ -151,6 +153,35 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
             title: 'Password Updated',
             description: 'Your security credentials have been changed successfully.'
         );
+    }
+
+    public function generateEsignature()
+    {
+        $this->validate([
+            'secret_code_input' => 'required|string|min:6',
+            'confirm_secret_code' => 'required|same:secret_code_input',
+        ]);
+
+        $esignature = $this->user->generateEsignature($this->secret_code_input);
+
+        $this->user->update([
+            'secret_code' => $this->secret_code_input,
+            'esignature' => $esignature,
+        ]);
+
+        $this->user->refresh();
+        $this->secret_code_input = '';
+        $this->confirm_secret_code = '';
+
+        $this->notification()->success(
+            title: 'Digital Signature Generated',
+            description: 'Your esignature has been created successfully.'
+        );
+    }
+
+    public function getHasEsignatureProperty(): bool
+    {
+        return !empty($this->user->esignature);
     }
 
     /**
@@ -383,7 +414,74 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                                 </x-card>
 
                             </div>
-                        </div>     
+                        </div>
+
+                        {{-- Digital Signature Section --}}
+                        <div class="my-10 border-t border-error/20 pt-10">
+                            <h1 class="sm:text-xl text-lg font-black text-base-800 tracking-tight sm:uppercase mb-6">Digital Signature</h1>
+                            
+                            <div class="grid grid-cols-1 gap-6">
+                                <x-card title="E-Signature Generator" rounded="3xl" shadow="none" class="border-base-200">
+                                    @if($this->hasEsignature)
+                                        <div class="bg-success/5 border border-success/20 rounded-2xl p-6 mb-6">
+                                            <div class="flex items-center gap-3 mb-4">
+                                                <x-icon name="check-badge" class="w-6 h-6 text-success" />
+                                                <h3 class="font-bold text-success">Signature Active</h3>
+                                            </div>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <p class="text-xs font-semibold mb-2 opacity-60">TEXT SIGNATURE</p>
+                                                    <div class="bg-base-200 rounded-xl p-4 font-mono text-sm break-all">
+                                                        {{ $user->formatted_esignature }}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <p class="text-xs font-semibold mb-2 opacity-60">QR CODE SIGNATURE</p>
+                                                    <div class="bg-base-200 rounded-xl p-4 flex items-center justify-center">
+                                                        @if($qrCode = $user->generateQrCodePng())
+                                                            <img src="{{ $qrCode }}" alt="E-signature QR code" class="h-24" />
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p class="text-xs opacity-60 mt-2">Generated from your secret code and hash key.</p>
+                                        </div>
+                                    @endif
+
+                                    <form wire:submit="generateEsignature" class="space-y-4">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <x-password 
+                                                label="Secret Code" 
+                                                wire:model.live.blur="secret_code_input" 
+                                                placeholder="Min. 6 characters" 
+                                            />
+                                            <x-password 
+                                                label="Confirm Secret Code" 
+                                                wire:model.live.blur="confirm_secret_code" 
+                                                placeholder="Re-enter secret code" 
+                                            />
+                                        </div>
+                                        
+                                        <div class="flex items-center gap-3 p-4 bg-warning/10 border border-warning/20 rounded-xl">
+                                            <x-icon name="exclamation-triangle" class="w-5 h-5 text-warning flex-shrink-0" />
+                                            <p class="text-xs text-warning">Keep your secret code confidential. It is used to generate your unique digital signature.</p>
+                                        </div>
+
+                                        <div class="flex justify-end mt-4">
+                                            <x-button 
+                                                type="submit" 
+                                                primary 
+                                                outline
+                                                label="Generate Signature" 
+                                                icon="key"
+                                                spinner="generateEsignature" 
+                                                class="rounded-xl px-8"
+                                            />
+                                        </div>
+                                    </form>
+                                </x-card>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

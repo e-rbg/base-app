@@ -63,7 +63,7 @@ new #[Layout('layouts.print')]
                 <p class="text-lg font-bold uppercase">{{ $order->name }}</p>
             </div>
             <div class="text-right">
-                <label class="text-[9px] font-black uppercase text-gray-400">Date Issued</label>
+                <label class="text-[9px] font-black uppercase text-gray-400">Travel Order Date</label>
                 <p class="">{{ $order->travel_date->format('F d, Y') }}</p>
             </div>
 
@@ -144,7 +144,7 @@ new #[Layout('layouts.print')]
 
         {{-- Signatures --}}
         <div class="mt-20 grid grid-cols-2 gap-10 text-center">
-            @if(!empty($order->recommending_approval) && $order->recommending_approval !== 'N/A')
+            @if($order->travel_type !== 'intra_municipal' && !empty($order->recommending_approval) && $order->recommending_approval !== 'N/A')
             <div>
                 <p class="mb-14 text-left text-[9px] font-bold uppercase text-gray-400">Recommending Approval:</p>
                 <p class="border-b-2 border-black font-bold uppercase">{{ $order->recommending_approval }}</p>
@@ -155,7 +155,15 @@ new #[Layout('layouts.print')]
             </div>
             @endif
             <div>
-                <p class="mb-14 text-left text-[9px] font-bold uppercase text-gray-400">Approved By:</p>
+                <p class="mb-5 text-left text-[9px] font-bold uppercase text-gray-400">Approved By:</p>
+                @if($order->status === 'approved' && $order->user && $order->user->esignature)
+                    <div class="mb-2 w-1/4 flex flex-col justify-center items-center">
+                        @if($qrCode = $order->user->generateQrCodePng())
+                            <img src="{{ $qrCode }}" alt="E-signature QR code" width="100" height="100" />
+                        @endif
+                        <p class="font-mono text-[8px] tracking-tight leading-none mt-1">{{ $order->user->esignature }}</p>
+                    </div>
+                @endif
                 <p class="border-b-2 border-black font-bold uppercase">{{ $order->approved_by_name }}</p>
                 <p class="text-xs italic">{{ $order->approved_by_position }}</p>
             </div>

@@ -117,12 +117,11 @@ new #[Layout('layouts.app')]
                         <td class="p-4 flex justify-center gap-2">
                             <x-button rounded icon="pencil" wire:click="edit('{{ $officer->id }}')" />
                             <x-button rounded negative icon="trash"
-                                x-on:confirm="{
+                                x-on:click="$wireui.confirmDialog({
                                     title: 'Delete Officer?',
                                     description: 'This will remove the assigned officer for this station.',
-                                    method: 'delete',
-                                    params: '{{ $officer->id }}'
-                                }"
+                                    accept: { label: 'Confirm', execute: () => $wire.delete(@js($officer->id)) }
+                                })"
                             />
                         </td>
                     </tr>

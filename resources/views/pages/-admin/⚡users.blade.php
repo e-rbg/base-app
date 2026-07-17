@@ -46,9 +46,9 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
         $user = User::with('profile')->findOrFail($id);
         
         $this->selected_id = $id;
-        $this->first_name  = $user->profile->first_name;
-        $this->middle_name = $user->profile->middle_name ?? '';
-        $this->last_name   = $user->profile->last_name;
+        $this->first_name  = $user->profile?->first_name ?? '';
+        $this->middle_name = $user->profile?->middle_name ?? '';
+        $this->last_name   = $user->profile?->last_name ?? '';
         $this->username    = $user->username;
         $this->email       = $user->email;
         $this->role        = $user->role ?? 'user'; // Load Role
@@ -95,11 +95,16 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
             if ($isEdit) {
                 $user = User::findOrFail($this->selected_id);
                 $user->update($userData);
-                $user->profile->update([
+                $profileData = [
                     'first_name'  => $this->first_name,
                     'middle_name' => $this->middle_name,
                     'last_name'   => $this->last_name,
-                ]);
+                ];
+                if ($user->profile) {
+                    $user->profile->update($profileData);
+                } else {
+                    $user->profile()->create($profileData);
+                }
             } else {
                 // If creating, the system still needs a role/password. 
                 // We ensure it falls back to 'user' and a random password 
@@ -218,12 +223,12 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
                                     @php
                                         $avatarUrl = $user->profile?->avatar 
                                             ? asset('storage/' . $user->profile->avatar) 
-                                            : 'https://ui-avatars.com/api/?name=' . urlencode($user->fullname) . '&background=random';
+                                            : 'https://ui-avatars.com/api/?name=' . urlencode($user->full_name) . '&background=random';
                                     @endphp
 
                                     {{-- Trigger: Dispatches event to the Global SFC --}}
                                     <div class="cursor-zoom-in hover:scale-110 transition-transform active:scale-95"
-                                        @click="$dispatch('preview-image', { url: '{{ $avatarUrl }}', title: '{{ $user->fullname }}' })">
+                                        @click="$dispatch('preview-image', { url: '{{ $avatarUrl }}', title: '{{ $user->full_name }}' })">
                                         
                                         <x-avatar 
                                             size="w-10 h-10" 
@@ -233,7 +238,7 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
                                     </div>
 
                                     <div class="flex flex-col">
-                                        <span class="font-bold text-sm leading-none">{{ $user->fullname }}</span>
+                                        <span class="font-bold text-sm leading-none">{{ $user->full_name }}</span>
                                         <span class="text-xs opacity-40 mt-1">@ {{ $user->username }}</span>
                                     </div>
                                 </div>
@@ -273,10 +278,10 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
                             @php
                                 $avatarUrl = $user->profile?->avatar 
                                     ? asset('storage/' . $user->profile->avatar) 
-                                    : 'https://ui-avatars.com/api/?name=' . urlencode($user->fullname) . '&background=random';
+                                    : 'https://ui-avatars.com/api/?name=' . urlencode($user->full_name) . '&background=random';
                             @endphp
                             <div class="cursor-zoom-in hover:scale-110 transition-transform active:scale-95"
-                                @click="$dispatch('preview-image', { url: '{{ $avatarUrl }}', title: '{{ $user->fullname }}' })">
+                                @click="$dispatch('preview-image', { url: '{{ $avatarUrl }}', title: '{{ $user->full_name }}' })">
                                 
                                 <x-avatar 
                                     size="w-10 h-10" 

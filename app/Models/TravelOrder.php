@@ -37,6 +37,8 @@ class TravelOrder extends Model
         'status',
         'approved_at',
         'esignature_hash',
+        'recommending_approved_at',
+        'esignature_recommender_hash',
 
 
     ];
@@ -47,6 +49,7 @@ class TravelOrder extends Model
         'travel_date' => 'date',
         'departure_date' => 'date',
         'return_date' => 'date',
+        'recommending_approved_at' => 'datetime',
     ];
 
     /**

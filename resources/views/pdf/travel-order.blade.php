@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>Travel Order {{ $order->travel_order_no }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    @vite(['resources/css/app.css'])
     <style>
         @page { size: A4 portrait; margin: 0.5in; }
         @media print {
@@ -17,7 +17,7 @@
         {{-- Header --}}
         <div class="flex items-center justify-between border-b-2 border-black pb-4">
             @if(file_exists(public_path('images/dar-logo.png')))
-                <img src="{{ public_path('images/dar-logo.png') }}" class="h-16 w-auto">
+                <img src="{{ asset('images/dar-logo.png') }}" class="h-16 w-auto">
             @else
                 <div class="flex h-16 w-16 items-center justify-center border text-[8px]">DAR LOGO</div>
             @endif
@@ -28,7 +28,7 @@
                 <p class="m-0 text-xs">Davao de Oro</p>
             </div>
             @if(file_exists(public_path('images/bagong-pilipinas-logo.png')))
-                <img src="{{ public_path('images/bagong-pilipinas-logo.png') }}" class="h-16 w-auto">
+                <img src="{{ asset('images/bagong-pilipinas-logo.png') }}" class="h-16 w-auto">
             @else
                 <div class="flex h-16 w-16 items-center justify-center border text-[8px]">BP LOGO</div>
             @endif
@@ -47,7 +47,7 @@
                 <p class="text-lg font-bold uppercase">{{ $order->name }}</p>
             </div>
             <div class="text-right">
-                <label class="text-[9px] font-black uppercase text-gray-400">Date Issued</label>
+                <label class="text-[9px] font-black uppercase text-gray-400">Travel Order Date</label>
                 <p class="">{{ $order->travel_date->format('F d, Y') }}</p>
             </div>
 
@@ -128,7 +128,7 @@
 
         {{-- Signatures --}}
         <div class="mt-20 grid grid-cols-2 gap-10 text-center">
-            @if(!empty($order->recommending_approval) && $order->recommending_approval !== 'N/A')
+            @if($order->travel_type !== 'intra_municipal' && !empty($order->recommending_approval) && $order->recommending_approval !== 'N/A')
             <div>
                 <p class="mb-14 text-left text-[9px] font-bold uppercase text-gray-400">Recommending Approval:</p>
                 <p class="border-b-2 border-black font-bold uppercase">{{ $order->recommending_approval }}</p>
@@ -139,7 +139,15 @@
             </div>
             @endif
             <div>
-                <p class="mb-14 text-left text-[9px] font-bold uppercase text-gray-400">Approved By:</p>
+                <p class="mb-5 text-left text-[9px] font-bold uppercase text-gray-400">Approved By:</p>
+                @if($order->status === 'approved' && $order->user && $order->user->esignature)
+                    <div class="mb-2 w-1/4 flex flex-col justify-center items-center">
+                        @if($qrCode = $order->user->generateQrCodePng())
+                            <img src="{{ $qrCode }}" alt="E-signature QR code" width="100" height="100" />
+                        @endif
+                        <p class="font-mono text-[8px] tracking-tight leading-none mt-1">{{ $order->user->esignature }}</p>
+                    </div>
+                @endif
                 <p class="border-b-2 border-black font-bold uppercase">{{ $order->approved_by_name }}</p>
                 <p class="text-xs italic">{{ $order->approved_by_position }}</p>
             </div>

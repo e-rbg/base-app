@@ -10,11 +10,13 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "bacon/bacon-qr-code": "^3.1",
         "barryvdh/laravel-dompdf": "^3.1",
         "edeesonopina/laravel-psgc-api": "^1.1",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^4.1",
+        "picqer/php-barcode-generator": "^3.2",
         "spatie/browsershot": "^5.4",
         "spatie/laravel-pdf": "^2.12",
         "wireui/wireui": "^2.5"
