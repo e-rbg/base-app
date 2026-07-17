@@ -3,8 +3,9 @@
 ## Stack
 
 - Laravel 12 / PHP ^8.2 / Livewire 4 / Tailwind CSS v4 / DaisyUI / WireUI
-- SQLite (dev + testing), Pest 4, DomPDF
-- UUID primary keys (`HasUuids`) and soft deletes on User, TravelOrder
+- SQLite (dev + testing), Pest 4, DomPDF, Spatie Laravel PDF, Browsershot
+- PSGC API (`edeesonopina/laravel-psgc-api`) for Philippine barangay lookups
+- UUID primary keys (`HasUuids`) on all models; soft deletes on User, TravelOrder only (StationOfficer has no soft deletes)
 - User must verify email (`MustVerifyEmail`)
 
 ## Commands
@@ -35,26 +36,34 @@ This repo uses **Livewire 4 single-file components (SFC)**. Component PHP classe
 ## Directory Structure
 
 ```
-app/Models/          TravelOrder, User, UserProfile (UUID PKs)
+app/Models/          TravelOrder, User, UserProfile, StationOfficer (UUID PKs)
 app/Http/Controllers TravelOrderController, TravelOrderPrintController
+app/Mail/            VerifyNewEmail
 resources/views/
   pages/-admin/      Dashboard, travel-orders, users, settings, help, etc.
   auth/              Login, register, logout, verify-email
   components/        Shared ⚡-prefixed Blade components
-  layouts/           app.blade.php (sidebar wrapper), auth.blade.php
+  layouts/           app.blade.php (sidebar wrapper), auth.blade.php, print.blade.php
   pdf/               DomPDF templates (travel-order.blade.php)
+  travel-orders/     print.blade.php (used by TravelOrderPrintController)
+  partials/          head.blade.php
 config/
   davao_de_oro.php   Barangay lookup data (municipality -> barangays)
   dar_hr.php         DAR positions + officers
+  psgc.php           PSGC API config (barangay/municipality lookups)
+  laravel-pdf.php    Spatie PDF config
 routes/web.php       Admin routes under /admin with auth+verified middleware
-database/migrations  users, travel_orders, jobs, cache
+database/migrations  users, travel_orders, station_officers, psgc tables, jobs, cache
+database/seeders     StationOfficerSeeder, DatabaseSeeder
 ```
 
 ## Auth & Roles
 
 Roles on User model: `super_admin`, `admin`, `editor`, `user`
 - Admin panel routes protected by `can:access-admin-panels` middleware
-- `super_admin` sees soft-deleted records
+- `super_admin` sees soft-deleted records (via `Gate::before` in AppServiceProvider)
+- `delete-content` gate: super_admin only
+- `manage-users` gate: super_admin + admin
 - Guest routes: `/login`, `/register`
 
 ## Gotchas
