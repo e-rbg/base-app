@@ -35,8 +35,9 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     public $recommending_approval = '';
     public $recommending_position = '';
     public bool $readOnly = false;
-    public ?string $statusFilter = null;
+    public array $statusFilter = [];
     public string $activeTab = 'mine';
+    public string $search = '';
 
     // Triggered when Vehicle Type changes (WireUI v2)
     public function updatedVehicleType($value)
@@ -53,6 +54,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             'all'           => $this->allTravelOrders(),
             'mine'          => $this->myTravelOrders(),
             'for_approval'  => $this->forApprovalOrders(),
+            'archived'      => $this->archivedTravelOrders(),
             default         => $this->myTravelOrders(),
         };
     }
@@ -60,7 +62,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     public function setTab(string $tab): void
     {
         $this->activeTab = $tab;
-        $this->statusFilter = null;
+        $this->statusFilter = [];
         $this->resetPage();
     }
 
@@ -68,22 +70,39 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     {
         $query = TravelOrder::query()->with('user');
 
-        if ($this->statusFilter) {
-            $query->where('status', $this->statusFilter);
+        if (!empty($this->statusFilter)) {
+            $query->whereIn('status', $this->statusFilter);
         }
 
-        return $query->withTrashed()->latest()->paginate(10);
+        if ($this->search) {
+            $query->where(function ($q) {
+                $q->where('travel_order_no', 'like', "%{$this->search}%")
+                  ->orWhere('name', 'like', "%{$this->search}%")
+                  ->orWhere('destination', 'like', "%{$this->search}%");
+            });
+        }
+
+        return $query->latest()->paginate(10);
     }
 
     private function myTravelOrders()
     {
-        $query = TravelOrder::query()->with('user');
+        $query = TravelOrder::query()->with('user')
+            ->where('user_id', auth()->id());
 
-        if ($this->statusFilter) {
-            $query->where('status', $this->statusFilter);
+        if (!empty($this->statusFilter)) {
+            $query->whereIn('status', $this->statusFilter);
         }
 
-        return $query->withTrashed()->latest()->paginate(10);
+        if ($this->search) {
+            $query->where(function ($q) {
+                $q->where('travel_order_no', 'like', "%{$this->search}%")
+                  ->orWhere('name', 'like', "%{$this->search}%")
+                  ->orWhere('destination', 'like', "%{$this->search}%");
+            });
+        }
+
+        return $query->latest()->paginate(10);
     }
 
     private function forApprovalOrders()
@@ -102,16 +121,45 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             $query->where('user_id', '!=', $user->id);
         }
 
-        if ($this->statusFilter) {
-            $query->where('status', $this->statusFilter);
+        if (!empty($this->statusFilter)) {
+            $query->whereIn('status', $this->statusFilter);
         }
 
-        return $query->withTrashed()->latest()->paginate(10);
+        if ($this->search) {
+            $query->where(function ($q) {
+                $q->where('travel_order_no', 'like', "%{$this->search}%")
+                  ->orWhere('name', 'like', "%{$this->search}%")
+                  ->orWhere('destination', 'like', "%{$this->search}%");
+            });
+        }
+
+        return $query->latest()->paginate(10);
+    }
+
+    private function archivedTravelOrders()
+    {
+        $query = TravelOrder::withTrashed()->with('user');
+
+        if ($this->search) {
+            $query->where(function ($q) {
+                $q->where('travel_order_no', 'like', "%{$this->search}%")
+                  ->orWhere('name', 'like', "%{$this->search}%")
+                  ->orWhere('destination', 'like', "%{$this->search}%");
+            });
+        }
+
+        return $query->latest()->paginate(10);
     }
 
     public function setStatusFilter(?string $status): void
     {
-        $this->statusFilter = ($this->statusFilter === $status) ? null : $status;
+        if ($status === null) {
+            $this->statusFilter = [];
+        } elseif (in_array($status, $this->statusFilter)) {
+            $this->statusFilter = array_values(array_diff($this->statusFilter, [$status]));
+        } else {
+            $this->statusFilter[] = $status;
+        }
         $this->resetPage();
     }
 
@@ -147,11 +195,21 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     {
         return StationOfficer::ordered()
             ->get()
-            ->pluck('officer_name', 'station_code')
-            ->mapWithKeys(fn($name, $code) => [
-                $code => ['name' => $name, 'pos' => StationOfficer::where('station_code', $code)->value('position')],
+            ->mapWithKeys(fn($officer) => [
+                $officer->station_code => [
+                    'name' => $officer->officer_name,
+                    'suffix' => $officer->academic_suffix,
+                    'pos' => $officer->position,
+                ],
             ])
             ->toArray();
+    }
+
+    private function formatNameWithSuffix(array $data): string
+    {
+        return $data['suffix']
+            ? "{$data['name']}, {$data['suffix']}"
+            : $data['name'];
     }
 
     public function updatedStation($value)
@@ -177,11 +235,13 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
 
         if (!$data) return;
 
-        $parpoName = "Zaldy A. Arenas, MDMG";
-        $parpoPos  = "PARPO II";
+        // PARPO II is always read from the live station_officers table (OPARO station)
+        $parpoData = $officers['OPARO'] ?? null;
+        $parpoName = $this->formatNameWithSuffix($parpoData ?? ['name' => 'Zaldy A. Arenas', 'suffix' => 'MDMG']);
+        $parpoPos  = $parpoData['pos'] ?? 'PARPO II';
 
         // Approved By is always the station officer
-        $this->approved_by_name = $data['name'];
+        $this->approved_by_name = $this->formatNameWithSuffix($data);
         $this->approved_by_position = $data['pos'];
 
         // Scenario A: User is in the Provincial Office (OPARO)
@@ -199,7 +259,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                 $this->recommending_position = '---';
             } else {
                 // Outside town: MARPO recommends, PARPO approves
-                $this->recommending_approval = $data['name'];
+                $this->recommending_approval = $this->formatNameWithSuffix($data);
                 $this->recommending_position = $data['pos'];
                 $this->approved_by_name = $parpoName;
                 $this->approved_by_position = $parpoPos;
@@ -213,7 +273,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                 $this->recommending_position = '---';
             } else {
                 // Outside province: Division Chief recommends, PARPO approves
-                $this->recommending_approval = $data['name'];
+                $this->recommending_approval = $this->formatNameWithSuffix($data);
                 $this->recommending_position = $data['pos'];
                 $this->approved_by_name = $parpoName;
                 $this->approved_by_position = $parpoPos;
@@ -252,6 +312,9 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         
         // Fill all fields from the database
         $this->fill($to->toArray());
+
+        // Refresh approval fields from live station_officers data
+        $this->applyApprovalLogic();
         
         // Ensure "Others" visibility logic works immediately upon opening
         $this->vehicle_type = $to->vehicle_type === 'Government Vehicle' ? 'Government Vehicle' : 'Others';
@@ -333,34 +396,139 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         if (empty($this->purpose_of_trip)) $this->purpose_of_trip = [''];
     }
 
-    public function delete($id)
+    public function deleteOrder($id)
     {
-        // We use withTrashed() so the Admin can still find it to force-delete
         $order = TravelOrder::withTrashed()->findOrFail($id);
         $user = auth()->user();
 
-        // 1. Logic for Super Admin (Permanent Delete)
-        if ($user->isSuperAdmin()) {
-            // If it was already soft-deleted, or they just want it gone forever
-            $order->forceDelete();
-            $this->notification()->success('Permanent Delete', 'Record wiped from database.');
-            return;
+        // 1. Privileged roles (super admin & admin) may soft-delete ANY travel order
+        if (! ($user->isSuperAdmin() || $user->isAdmin())) {
+            // 2. Regular users may only soft-delete their own, non-approved orders
+            if ($order->user_id !== $user->id) {
+                return $this->notification()->error('Unauthorized', 'You can only delete your own orders.');
+            }
+
+            if ($order->status === 'approved') {
+                return $this->notification()->error('Locked', 'Approved orders cannot be deleted.');
+            }
         }
 
-        // 2. Logic for Regular Users (Soft Delete)
-        // Check if they own it and it's not approved
-        if ($order->user_id !== $user->id) {
-            $this->notification()->error('Unauthorized', 'You can only delete your own orders.');
-            return;
+        $this->dialog()->confirm([
+            'title'       => 'Delete Travel Order?',
+            'description' => 'This will permanently remove travel order no. ' . $order->travel_order_no . '. This action cannot be undone.',
+            'icon'        => 'trash',
+            'accept'      => [
+                'label'  => 'Delete',
+                'color'  => 'negative',
+                'method' => 'performDelete',
+                'params' => $id,
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
+
+    public function performDelete($id)
+    {
+        $order = TravelOrder::withTrashed()->findOrFail($id);
+        $order->delete();
+        $this->notification()->warning('Archived', 'Travel order moved to trash.');
+    }
+
+    public function restoreOrder($id)
+    {
+        if (! auth()->user()->isSuperAdmin()) {
+            return $this->notification()->error('Unauthorized', 'Only super admins can restore archived orders.');
         }
 
-        if ($order->status === 'approved') {
-            $this->notification()->error('Locked', 'Approved orders cannot be deleted.');
-            return;
+        $order = TravelOrder::withTrashed()->findOrFail($id);
+
+        $this->dialog()->confirm([
+            'title'       => 'Restore Travel Order?',
+            'description' => 'This will restore travel order no. ' . $order->travel_order_no . ' back to the active list.',
+            'icon'        => 'arrow-uturn-left',
+            'accept'      => [
+                'label'  => 'Restore',
+                'color'  => 'positive',
+                'method' => 'performRestore',
+                'params' => $id,
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
+
+    public function performRestore($id)
+    {
+        $order = TravelOrder::withTrashed()->findOrFail($id);
+        $order->restore();
+        $this->notification()->success('Restored', 'Travel order has been restored.');
+    }
+
+    public function forceDeleteOrder($id)
+    {
+        if (! auth()->user()->isSuperAdmin()) {
+            return $this->notification()->error('Unauthorized', 'Only super admins can perform this action.');
         }
 
-        $order->delete(); // This is a Soft Delete because of the Trait
-        $this->notification()->warning('Archived', 'Order moved to trash.');
+        $order = TravelOrder::withTrashed()->findOrFail($id);
+
+        $this->dialog()->confirm([
+            'title'       => 'Permanently Delete?',
+            'description' => 'This will permanently delete travel order no. ' . $order->travel_order_no . '. This action cannot be undone.',
+            'icon'        => 'trash',
+            'accept'      => [
+                'label'  => 'Delete Permanently',
+                'color'  => 'negative',
+                'method' => 'performForceDelete',
+                'params' => $id,
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
+
+    public function performForceDelete($id)
+    {
+        $order = TravelOrder::withTrashed()->findOrFail($id);
+        $order->forceDelete();
+        $this->notification()->warning('Deleted', 'Travel order has been permanently deleted.');
+    }
+
+    public function deleteAllArchived()
+    {
+        if (! auth()->user()->isSuperAdmin()) {
+            return $this->notification()->error('Unauthorized', 'Only super admins can perform this action.');
+        }
+
+        $count = TravelOrder::onlyTrashed()->count();
+
+        if ($count === 0) {
+            return $this->notification()->info('Nothing to Delete', 'There are no archived travel orders.');
+        }
+
+        $this->dialog()->confirm([
+            'title'       => 'Permanently Delete All?',
+            'description' => "This will permanently delete {$count} archived travel order(s). This action cannot be undone.",
+            'icon'        => 'trash',
+            'accept'      => [
+                'label'  => 'Delete All',
+                'color'  => 'negative',
+                'method' => 'performDeleteAllArchived',
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
+
+    public function performDeleteAllArchived()
+    {
+        TravelOrder::onlyTrashed()->forceDelete();
+        $this->notification()->warning('Deleted', 'All archived travel orders have been permanently deleted.');
     }
 
     public function destinations(): array
@@ -503,29 +671,62 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $user = auth()->user();
 
         $isApprover = str_contains($order->approved_by_name, $user->full_name);
-        $isAdmin = $user->isSuperAdmin();
 
-        if (!$isApprover && !$isAdmin) {
-            $this->notification()->error('Unauthorized', 'You are not a designated signatory for this Travel Order.');
-            return;
+        if (!$isApprover) {
+            return $this->notification()->error('Unauthorized', 'You are not a designated signatory for this Travel Order.');
         }
 
-        // Determine which esignature to use
-        if ($isApprover && !$isAdmin) {
-            // Normal user who IS the approver — use their own esignature
-            $esignature = $user->esignature;
-        } else {
-            // Super admin — prefer the proper authority's esignature
-            $esignature = $this->resolveEsignature($order->approved_by_name, $user);
+        $this->dialog()->confirm([
+            'title'       => 'Approve Order?',
+            'description' => 'This will approve travel order no. ' . $order->travel_order_no . '. The document will be locked.',
+            'icon'        => 'check',
+            'accept'      => [
+                'label'  => 'Approve',
+                'color'  => 'positive',
+                'method' => 'performApproveOrder',
+                'params' => $id,
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
+
+    public function performApproveOrder($id)
+    {
+        $order = TravelOrder::findOrFail($id);
+        $user = auth()->user();
+        $signature = $user->activeSignature();
+
+        if (!$signature) {
+            return $this->notification()->error('No Signature', 'Please create and activate a digital signature first.');
         }
 
         $order->update([
             'status' => 'approved',
             'approved_at' => now(),
-            'esignature_hash' => $esignature ?? md5($user->id . now() . 'DAR-SECRET-KEY'),
+            'esignature_hash' => $signature->esignature_hash,
         ]);
 
         $this->notification()->success('Travel Order Approved', 'The document is now locked and ready for printing.');
+    }
+
+    public function disapproveOrder($id)
+    {
+        $order = TravelOrder::findOrFail($id);
+        $user = auth()->user();
+
+        $isApprover = str_contains($order->approved_by_name, $user->full_name);
+
+        if (!$isApprover) {
+            return $this->notification()->error('Unauthorized', 'You are not a designated signatory for this Travel Order.');
+        }
+
+        $order->update([
+            'status' => 'disapproved',
+        ]);
+
+        $this->notification()->warning('Travel Order Disapproved', 'The document has been marked as disapproved.');
     }
 
     public function recommendOrder($id)
@@ -534,47 +735,43 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $user = auth()->user();
 
         $isRecommender = str_contains($order->recommending_approval, $user->full_name);
-        $isAdmin = $user->isSuperAdmin();
 
-        if (!$isRecommender && !$isAdmin) {
-            $this->notification()->error('Unauthorized', 'You are not the designated recommender for this Travel Order.');
-            return;
+        if (!$isRecommender) {
+            return $this->notification()->error('Unauthorized', 'You are not the designated recommender for this Travel Order.');
         }
 
-        // Determine which esignature to use
-        if ($isRecommender && !$isAdmin) {
-            // Normal user who IS the recommender — use their own esignature
-            $esignature = $user->esignature;
-        } else {
-            // Super admin — prefer the proper authority's esignature
-            $esignature = $this->resolveEsignature($order->recommending_approval, $user);
+        $this->dialog()->confirm([
+            'title'       => 'Recommend Order?',
+            'description' => 'This will record your recommendation for travel order no. ' . $order->travel_order_no . '.',
+            'icon'        => 'finger-print',
+            'accept'      => [
+                'label'  => 'Confirm',
+                'color'  => 'info',
+                'method' => 'performRecommendOrder',
+                'params' => $id,
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
+
+    public function performRecommendOrder($id)
+    {
+        $order = TravelOrder::findOrFail($id);
+        $user = auth()->user();
+        $signature = $user->activeSignature();
+
+        if (!$signature) {
+            return $this->notification()->error('No Signature', 'Please create and activate a digital signature first.');
         }
 
         $order->update([
             'recommending_approved_at' => now(),
-            'esignature_recommender_hash' => $esignature ?? md5($user->id . now() . 'DAR-SECRET-KEY'),
+            'esignature_recommender_hash' => $signature->esignature_hash,
         ]);
 
         $this->notification()->success('Recommendation Recorded', 'The recommender has signed off on this travel order.');
-    }
-
-    /**
-     * Resolve the esignature to attach.
-     * Try to find the proper authority by name and use their esignature.
-     * Fall back to the super admin's esignature if the authority doesn't have one.
-     */
-    private function resolveEsignature(string $authorityName, $superAdmin): ?string
-    {
-        $authority = \App\Models\User::whereHas('profile', function ($q) use ($authorityName) {
-            $q->whereRaw("TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(middle_name, ''), ' ', COALESCE(last_name, ''))) = ?", [$authorityName]);
-        })->first();
-
-        if ($authority && $authority->esignature) {
-            return $authority->esignature;
-        }
-
-        // Fall back to super admin's own esignature
-        return $superAdmin->esignature;
     }
 
     public function revertApproval($id)
@@ -582,9 +779,28 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $order = TravelOrder::findOrFail($id);
 
         if (!auth()->user()->isSuperAdmin()) {
-            $this->notification()->error('Unauthorized', 'Only super admins can revert approvals.');
-            return;
+            return $this->notification()->error('Unauthorized', 'Only super admins can revert approvals.');
         }
+
+        $this->dialog()->confirm([
+            'title'       => 'Revert Approval?',
+            'description' => 'This will reset travel order no. ' . $order->travel_order_no . ' back to pending status.',
+            'icon'        => 'arrow-uturn-left',
+            'accept'      => [
+                'label'  => 'Revert',
+                'color'  => 'warning',
+                'method' => 'performRevertApproval',
+                'params' => $id,
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
+
+    public function performRevertApproval($id)
+    {
+        $order = TravelOrder::findOrFail($id);
 
         $order->update([
             'status' => 'pending',
@@ -602,9 +818,28 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $order = TravelOrder::findOrFail($id);
 
         if (!auth()->user()->isSuperAdmin()) {
-            $this->notification()->error('Unauthorized', 'Only super admins can revert recommendations.');
-            return;
+            return $this->notification()->error('Unauthorized', 'Only super admins can revert recommendations.');
         }
+
+        $this->dialog()->confirm([
+            'title'       => 'Revert Recommendation?',
+            'description' => 'This will remove the recommender sign-off for travel order no. ' . $order->travel_order_no . '.',
+            'icon'        => 'arrow-uturn-left',
+            'accept'      => [
+                'label'  => 'Revert',
+                'color'  => 'warning',
+                'method' => 'performRevertRecommendation',
+                'params' => $id,
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
+
+    public function performRevertRecommendation($id)
+    {
+        $order = TravelOrder::findOrFail($id);
 
         $order->update([
             'recommending_approved_at' => null,
@@ -612,15 +847,6 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         ]);
 
         $this->notification()->success('Recommendation Reverted', 'The recommender sign-off has been removed.');
-    }
-
-    public function viewTravelOrder(TravelOrder $to)
-    {
-        $this->readOnly = true; // Force read-only
-        $this->editing = $to;
-        $this->fill($to->toArray());
-        $this->purpose_of_trip = !empty($to->purpose_of_trip) ? $to->purpose_of_trip : [''];
-        $this->modal = true;
     }
 
     #[Computed]
@@ -637,59 +863,82 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
 
 }; ?>
 
-<div class="p-6">
-    <h1 class="text-2xl font-bold mb-6">Travel Orders</h1>
-
+<x-main-container 
+    title="Travel Orders" 
+    :breadcrumbs="[
+        ['url' => route('admin.dashboard'), 'label' => 'Dashboard'],
+        ['label' => 'Travel Orders']
+    ]"
+>
     {{-- Tabs --}}
     @php $isSuperAdmin = auth()->user()->isSuperAdmin(); @endphp
-    <div role="tablist" class="tabs tabs-boxed mb-6 w-fit">
+    <div role="tablist" class="trapezoid-tabs">
         @if($isSuperAdmin)
-            <button role="tab" class="tab {{ $activeTab === 'all' ? 'tab-active' : '' }}"
+            <button role="tab" class="trapezoid-tab {{ $activeTab === 'all' ? 'trapezoid-tab-active' : '' }}"
                 wire:click="setTab('all')">
-                <x-icon name="globe-alt" class="w-4 h-4 mr-1" /> All Travel Orders
+                <x-icon name="globe-alt" class="w-4 h-4 shrink-0" /> All Travel Orders
             </button>
         @endif
-        <button role="tab" class="tab {{ $activeTab === 'mine' ? 'tab-active' : '' }}"
+        <button role="tab" class="trapezoid-tab {{ $activeTab === 'mine' ? 'trapezoid-tab-active' : '' }}"
             wire:click="setTab('mine')">
-            <x-icon name="user" class="w-4 h-4 mr-1" /> My Travel Orders
+            <x-icon name="user" class="w-4 h-4 shrink-0" /> My Travel Orders
         </button>
-        <button role="tab" class="tab {{ $activeTab === 'for_approval' ? 'tab-active' : '' }}"
+        <button role="tab" class="trapezoid-tab {{ $activeTab === 'for_approval' ? 'trapezoid-tab-active' : '' }}"
             wire:click="setTab('for_approval')">
-            <x-icon name="clipboard-document-check" class="w-4 h-4 mr-1" /> For Approval
+            <x-icon name="clipboard-document-check" class="w-4 h-4 shrink-0" /> For Approval
         </button>
+        @if($isSuperAdmin)
+            <button role="tab" class="trapezoid-tab {{ $activeTab === 'archived' ? 'trapezoid-tab-active' : '' }}"
+                wire:click="setTab('archived')">
+                <x-icon name="archive-box" class="w-4 h-4 shrink-0" /> Archived
+            </button>
+        @endif
     </div>
 
     {{-- Status Filters --}}
+    @if($activeTab !== 'archived')
     <div class="flex justify-between items-center mb-4">
-        <div class="flex gap-2">
-            @if(!$statusFilter)
-                <x-button primary outline label="All" icon="funnel" wire:click="setStatusFilter(null)" />
-            @else
-                <x-button secondary outline label="All" icon="funnel" wire:click="setStatusFilter(null)" />
-            @endif
-
-            @if($statusFilter === 'pending')
-                <x-button warning outline label="Pending" icon="clock" wire:click="setStatusFilter('pending')" />
-            @else
-                <x-button secondary outline label="Pending" icon="clock" wire:click="setStatusFilter('pending')" />
-            @endif
-
-            @if($statusFilter === 'approved')
-                <x-button success outline label="Approved" icon="check" wire:click="setStatusFilter('approved')" />
-            @else
-                <x-button secondary outline label="Approved" icon="check" wire:click="setStatusFilter('approved')" />
-            @endif
-
-            @if($statusFilter === 'disapproved')
-                <x-button error outline label="Disapproved" icon="x-mark" wire:click="setStatusFilter('disapproved')" />
-            @else
-                <x-button secondary outline label="Disapproved" icon="x-mark" wire:click="setStatusFilter('disapproved')" />
-            @endif
+        <div class="flex items-center gap-4">
+            <label class="flex items-center gap-1.5 cursor-pointer text-sm">
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                    checked="{{ empty($statusFilter) }}"
+                    wire:click="setStatusFilter(null)" />
+                <x-icon name="funnel" class="w-4 h-4" /> All
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer text-sm">
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-warning"
+                    checked="{{ in_array('pending', $statusFilter) }}"
+                    wire:click="setStatusFilter('pending')" />
+                <x-icon name="clock" class="w-4 h-4" /> Pending
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer text-sm">
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-success"
+                    checked="{{ in_array('approved', $statusFilter) }}"
+                    wire:click="setStatusFilter('approved')" />
+                <x-icon name="check" class="w-4 h-4" /> Approved
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer text-sm">
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-error"
+                    checked="{{ in_array('disapproved', $statusFilter) }}"
+                    wire:click="setStatusFilter('disapproved')" />
+                <x-icon name="x-mark" class="w-4 h-4" /> Disapproved
+            </label>
         </div>
 
         @if($activeTab === 'mine')
             <x-button primary label="New Travel Order" icon="plus" wire:click="create" />
         @endif
+    </div>
+    @else
+    <div class="flex justify-end items-center mb-4">
+        <x-button negative label="Empty Archive" icon="trash" wire:click="deleteAllArchived" />
+    </div>
+    @endif
+
+    {{-- Search --}}
+    <div class="mb-4">
+        <x-input icon="magnifying-glass" placeholder="Search travel orders..."
+            wire:model.live.debounce.300ms="search" shadow="none" />
     </div>
 
     {{-- Table --}}
@@ -750,95 +999,84 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
 
                     {{-- 5. ACTIONS --}}
                     <td class="p-4 flex justify-center gap-2">
-                        {{-- EDIT & DELETE: For owner if not approved, OR for super admin always --}}
-                        @if(($order->user_id === auth()->id() && $order->status !== 'approved') || auth()->user()->isSuperAdmin())
-                            <x-button rounded icon="pencil" wire:click="edit('{{ $order->id }}')" class="tooltip" data-tip="Edit" />
+                        {{-- VIEW: Open the PDF/print view for everyone --}}
+                        <x-button rounded info icon="eye" class="tooltip" data-tip="View"
+                            href="{{ route('admin.print-travel-order', $order->id) }}"
+                            target="_blank" />
 
-                            @php $isSoftDeleted = $order->trashed(); @endphp
+                        {{-- PRINT: Available for any record via the print view --}}
+                        <x-button sm icon="printer" class="tooltip" data-tip="Print"
+                            href="{{ route('admin.print-travel-order', $order->id) }}"
+                            target="_blank" />
 
-                            <x-button
-                                rounded
-                                :negative="!$isSoftDeleted"
-                                :black="$isSoftDeleted"
-                                :icon="$isSoftDeleted ? 'ban' : 'trash'"
-                                class="tooltip"
-                                :data-tip="$isSoftDeleted ? 'Permanent Delete' : 'Delete'"
-                                x-on:click="$wireui.confirmDialog({
-                                    title: @js($isSoftDeleted ? 'Permanent Delete?' : 'Delete Order?'),
-                                    description: @js($isSoftDeleted ? 'This will wipe the data forever.' : 'This will move the order to trash.'),
-                                    accept: { label: 'Confirm', execute: () => $wire.delete(@js($order->id)) }
-                                })"
-                            />
-                        @endif
+                        @if($activeTab === 'archived')
+                            {{-- RESTORE: Super admin can restore archived orders --}}
+                            <x-button rounded positive icon="arrow-uturn-left" wire:click="restoreOrder('{{ $order->id }}')" class="tooltip" data-tip="Restore" />
 
-                        {{-- PRINT: Available for approved orders --}}
-                        @if($order->status === 'approved')
-                            <x-button 
-                                sm 
-                                icon="printer"
-                                label="Print"
-                                href="{{ route('admin.print-travel-order', $order->id) }}"
-                                target="_blank"
-                            />
+                            {{-- PERMANENT DELETE: Super admin can permanently delete archived orders --}}
+                            <x-button rounded negative icon="trash" wire:click="forceDeleteOrder('{{ $order->id }}')" class="tooltip" data-tip="Delete Permanently" />
+                        @else
+                            {{-- EDIT & DELETE: For owner if not approved, OR for privileged roles (super admin / admin) --}}
+                            @if(($order->user_id === auth()->id() && $order->status !== 'approved') || auth()->user()->isSuperAdmin() || auth()->user()->isAdmin())
+                                <x-button rounded icon="pencil" wire:click="edit('{{ $order->id }}')" class="tooltip" data-tip="Edit" />
 
-                            @if(auth()->user()->isSuperAdmin())
+                                <x-button
+                                    rounded
+                                    negative
+                                    icon="trash"
+                                    class="tooltip"
+                                    data-tip="Delete"
+                                    wire:click="deleteOrder('{{ $order->id }}')"
+                                />
+                            @endif
+
+                            {{-- PRINT REVERT: Super admin can revert an approved order --}}
+                            @if($order->status === 'approved' && auth()->user()->isSuperAdmin())
                                 <x-button rounded warning icon="arrow-uturn-left"
                                     class="tooltip" data-tip="Revert to Pending"
-                                    x-on:click="$wireui.confirmDialog({
-                                        title: 'Revert Approval?',
-                                        description: 'This will reset the travel order back to pending status.',
-                                        accept: { label: 'Confirm', execute: () => $wire.revertApproval(@js($order->id)) }
-                                    })"
-                                />
-                            @endif
-                        @endif
-
-                        {{-- APPROVAL: Only for Signatories or Super Admin --}}
-                        @if($order->status === 'pending')
-                            @php
-                                $needsRecommendation = $order->travel_type !== 'intra_municipal' &&
-                                    !empty($order->recommending_approval) && $order->recommending_approval !== 'N/A';
-                                $hasRecommended = !empty($order->recommending_approved_at);
-                                $isRecommender = str_contains($order->recommending_approval, auth()->user()->full_name);
-                                $isApprover = str_contains($order->approved_by_name, auth()->user()->full_name);
-                                $isAdmin = auth()->user()->isSuperAdmin();
-
-                                // Recommend button: needs recommendation, not yet done, user is the recommender or super admin
-                                $canRecommend = $needsRecommendation && !$hasRecommended && ($isRecommender || $isAdmin);
-
-                                // Approve button: either no recommendation needed, OR it's already done, OR user is super admin
-                                $canApprove = $isAdmin || !$needsRecommendation || $hasRecommended;
-                            @endphp
-
-                            @if($canRecommend)
-                                <x-button rounded info icon="finger-print"
-                                    class="tooltip" data-tip="Recommend"
-                                    x-on:click="$wireui.confirmDialog({
-                                        title: 'Recommend Order?',
-                                        accept: { label: 'Confirm', execute: () => $wire.recommendOrder(@js($order->id)) }
-                                    })"
+                                    wire:click="revertApproval('{{ $order->id }}')"
                                 />
                             @endif
 
-                            @if($needsRecommendation && $hasRecommended && $isAdmin)
-                                <x-button rounded warning icon="arrow-uturn-left"
-                                    class="tooltip" data-tip="Revert Recommendation"
-                                    x-on:click="$wireui.confirmDialog({
-                                        title: 'Revert Recommendation?',
-                                        description: 'This will remove the recommender sign-off.',
-                                        accept: { label: 'Confirm', execute: () => $wire.revertRecommendation(@js($order->id)) }
-                                    })"
-                                />
-                            @endif
+                            {{-- APPROVAL: Only for Signatories or Super Admin --}}
+                            @if($order->status === 'pending')
+                                @php
+                                    $needsRecommendation = $order->travel_type !== 'intra_municipal' &&
+                                        !empty($order->recommending_approval) && $order->recommending_approval !== 'N/A';
+                                    $hasRecommended = !empty($order->recommending_approved_at);
+                                    $isRecommender = str_contains($order->recommending_approval, auth()->user()->full_name);
+                                    $isApprover = str_contains($order->approved_by_name, auth()->user()->full_name);
+                                    $isAdmin = auth()->user()->isSuperAdmin();
 
-                            @if($canApprove)
-                                <x-button rounded positive icon="check"
-                                    class="tooltip" data-tip="Approve"
-                                    x-on:click="$wireui.confirmDialog({
-                                        title: 'Approve Order?',
-                                        accept: { label: 'Confirm', execute: () => $wire.approveOrder(@js($order->id)) }
-                                    })"
-                                />
+                                    // Recommend button: needs recommendation, not yet done, user is the named recommender
+                                    $canRecommend = $needsRecommendation && !$hasRecommended && $isRecommender;
+
+                                    // Approve button: only the named approver (or recommender for intra-municipal
+                                    // where recommending is N/A) may approve. Super admin is no longer given a
+                                    // blanket approve right — they must be the named authority on the order.
+                                    $canApprove = $isApprover || $isRecommender;
+                                @endphp
+
+                                @if($canRecommend)
+                                    <x-button rounded info icon="finger-print"
+                                        class="tooltip" data-tip="Recommend"
+                                        wire:click="recommendOrder('{{ $order->id }}')"
+                                    />
+                                @endif
+
+                                @if($needsRecommendation && $hasRecommended && $isAdmin)
+                                    <x-button rounded warning icon="arrow-uturn-left"
+                                        class="tooltip" data-tip="Revert Recommendation"
+                                        wire:click="revertRecommendation('{{ $order->id }}')"
+                                    />
+                                @endif
+
+                                @if($canApprove)
+                                    <x-button rounded positive icon="check"
+                                        class="tooltip" data-tip="Approve"
+                                        wire:click="approveOrder('{{ $order->id }}')"
+                                    />
+                                @endif
                             @endif
                         @endif
                     </td>
@@ -1025,4 +1263,4 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     </x-modal-card>
     <!-- END OF CREATE / EDIT MODAL -->
 
-</div>
+</x-main-container>

@@ -18,6 +18,7 @@ new #[Layout('layouts.app')]
 
     public string $station_code = '';
     public string $officer_name = '';
+    public ?string $academic_suffix = null;
     public string $position = '';
 
     public function updatingSearch()
@@ -30,14 +31,15 @@ new #[Layout('layouts.app')]
     {
         return StationOfficer::query()
             ->when($this->search, fn($q) => $q->where('station_code', 'like', "%{$this->search}%")
-                ->orWhere('officer_name', 'like', "%{$this->search}%"))
+                ->orWhere('officer_name', 'like', "%{$this->search}%")
+                ->orWhere('academic_suffix', 'like', "%{$this->search}%"))
             ->ordered()
             ->paginate(15);
     }
 
     public function create()
     {
-        $this->reset(['station_code', 'officer_name', 'position']);
+        $this->reset(['station_code', 'officer_name', 'academic_suffix', 'position']);
         $this->editing = null;
         $this->modal = true;
     }
@@ -47,6 +49,7 @@ new #[Layout('layouts.app')]
         $this->editing = $officer;
         $this->station_code = $officer->station_code;
         $this->officer_name = $officer->officer_name;
+        $this->academic_suffix = $officer->academic_suffix;
         $this->position = $officer->position;
         $this->modal = true;
     }
@@ -54,17 +57,19 @@ new #[Layout('layouts.app')]
     public function save()
     {
         $this->validate([
-            'station_code' => 'required|string|max:255',
-            'officer_name' => 'required|string|max:255',
-            'position'     => 'required|string|max:255',
+            'station_code'     => 'required|string|max:255',
+            'officer_name'     => 'required|string|max:255',
+            'academic_suffix'  => 'nullable|string|max:255',
+            'position'         => 'required|string|max:255',
         ]);
 
         StationOfficer::updateOrCreate(
             ['id' => $this->editing?->id],
             [
-                'station_code' => $this->station_code,
-                'officer_name' => $this->officer_name,
-                'position'     => $this->position,
+                'station_code'     => $this->station_code,
+                'officer_name'     => $this->officer_name,
+                'academic_suffix'  => $this->academic_suffix ?: null,
+                'position'         => $this->position,
             ]
         );
 
@@ -74,21 +79,44 @@ new #[Layout('layouts.app')]
         );
 
         $this->modal = false;
-        $this->reset(['station_code', 'officer_name', 'position']);
+        $this->reset(['station_code', 'officer_name', 'academic_suffix', 'position']);
         $this->editing = null;
     }
 
     public function delete(StationOfficer $officer)
     {
-        $officer->delete();
+        $this->dialog()->confirm([
+            'title'       => 'Delete Officer?',
+            'description' => 'This will remove ' . $officer->officer_name . ' from ' . $officer->station_code . '.',
+            'icon'        => 'trash',
+            'accept'      => [
+                'label'  => 'Delete',
+                'color'  => 'negative',
+                'method' => 'performDelete',
+                'params' => $officer->id,
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
 
+    public function performDelete(string $id)
+    {
+        StationOfficer::findOrFail($id)->delete();
         $this->notification()->success('Deleted', 'Station officer has been removed.');
     }
 }; ?>
 
-<div class="p-6">
+<x-main-container 
+    title="Station Officers" 
+    :breadcrumbs="[
+        ['url' => route('admin.dashboard'), 'label' => 'Dashboard'],
+        ['label' => 'Station Officers']
+    ]"
+>
     <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">Station Officers</h1>
+        <div></div>
         <x-button primary label="Add Officer" icon="plus" wire:click="create" />
     </div>
 
@@ -104,6 +132,7 @@ new #[Layout('layouts.app')]
                 <tr>
                     <th class="p-4">Station Code</th>
                     <th class="p-4">Officer Name</th>
+                    <th class="p-4">Suffix</th>
                     <th class="p-4">Position</th>
                     <th class="p-4 text-center">Actions</th>
                 </tr>
@@ -113,21 +142,18 @@ new #[Layout('layouts.app')]
                     <tr>
                         <td class="p-4 font-bold">{{ $officer->station_code }}</td>
                         <td class="p-4">{{ $officer->officer_name }}</td>
+                        <td class="p-4">{{ $officer->academic_suffix ?: '—' }}</td>
                         <td class="p-4">{{ $officer->position }}</td>
                         <td class="p-4 flex justify-center gap-2">
                             <x-button rounded icon="pencil" wire:click="edit('{{ $officer->id }}')" />
                             <x-button rounded negative icon="trash"
-                                x-on:click="$wireui.confirmDialog({
-                                    title: 'Delete Officer?',
-                                    description: 'This will remove the assigned officer for this station.',
-                                    accept: { label: 'Confirm', execute: () => $wire.delete(@js($officer->id)) }
-                                })"
+                                wire:click="delete('{{ $officer->id }}')"
                             />
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="p-8 text-center opacity-50">No station officers found.</td>
+                        <td colspan="5" class="p-8 text-center opacity-50">No station officers found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -140,6 +166,7 @@ new #[Layout('layouts.app')]
         <div class="space-y-4">
             <x-input label="Station Code" wire:model="station_code" placeholder="e.g. DARMO-Nabunturan" />
             <x-input label="Officer Name" wire:model="officer_name" placeholder="e.g. Juan Dela Cruz" />
+            <x-input label="Academic Suffix (optional)" wire:model="academic_suffix" placeholder="e.g. MPA, MDMG, MExEd" />
             <x-input label="Position" wire:model="position" placeholder="e.g. MARPO" />
         </div>
 
@@ -150,4 +177,4 @@ new #[Layout('layouts.app')]
             </div>
         </x-slot>
     </x-modal-card>
-</div>
+</x-main-container>

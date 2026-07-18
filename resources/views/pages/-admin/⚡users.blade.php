@@ -12,7 +12,7 @@ use Livewire\Attributes\Layout;
 new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
 {
     use WithPagination, WireUiActions;
-    
+
     public $search = '';
     public bool $userModal = false;
 
@@ -44,7 +44,7 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
     {
         $this->resetValidation();
         $user = User::with('profile')->findOrFail($id);
-        
+
         $this->selected_id = $id;
         $this->first_name  = $user->profile?->first_name ?? '';
         $this->middle_name = $user->profile?->middle_name ?? '';
@@ -52,9 +52,9 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
         $this->username    = $user->username;
         $this->email       = $user->email;
         $this->role        = $user->role ?? 'user'; // Load Role
-        $this->password    = '';       
+        $this->password    = '';
         $this->userModal = true;
-        
+
     }
 
     public function save()
@@ -86,7 +86,7 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
             // SECURITY: Only update Role and Password if requester is Super Admin
             if ($isSuperAdmin) {
                 $userData['role'] = $this->role;
-                
+
                 if (!empty($this->password)) {
                     $userData['password'] = Hash::make($this->password);
                 }
@@ -106,8 +106,8 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
                     $user->profile()->create($profileData);
                 }
             } else {
-                // If creating, the system still needs a role/password. 
-                // We ensure it falls back to 'user' and a random password 
+                // If creating, the system still needs a role/password.
+                // We ensure it falls back to 'user' and a random password
                 // if for some reason a non-super-admin is creating (though you should block the whole page).
                 if (!$isSuperAdmin) {
                     $userData['role'] = 'user';
@@ -221,19 +221,19 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
                             <td class="py-5 pl-10">
                                 <div class="flex items-center gap-4">
                                     @php
-                                        $avatarUrl = $user->profile?->avatar 
-                                            ? asset('storage/' . $user->profile->avatar) 
+                                        $avatarUrl = $user->profile?->avatar
+                                            ? asset('storage/' . $user->profile->avatar)
                                             : 'https://ui-avatars.com/api/?name=' . urlencode($user->full_name) . '&background=random';
                                     @endphp
 
                                     {{-- Trigger: Dispatches event to the Global SFC --}}
                                     <div class="cursor-zoom-in hover:scale-110 transition-transform active:scale-95"
                                         @click="$dispatch('preview-image', { url: '{{ $avatarUrl }}', title: '{{ $user->full_name }}' })">
-                                        
-                                        <x-avatar 
-                                            size="w-10 h-10" 
-                                            rounded="lg" 
-                                            :src="$avatarUrl" 
+
+                                        <x-avatar
+                                            size="w-10 h-10"
+                                            rounded="lg"
+                                            :src="$avatarUrl"
                                         />
                                     </div>
 
@@ -276,33 +276,33 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
                     <div class="flex justify-between items-start">
                         <div class="flex items-center gap-4">
                             @php
-                                $avatarUrl = $user->profile?->avatar 
-                                    ? asset('storage/' . $user->profile->avatar) 
+                                $avatarUrl = $user->profile?->avatar
+                                    ? asset('storage/' . $user->profile->avatar)
                                     : 'https://ui-avatars.com/api/?name=' . urlencode($user->full_name) . '&background=random';
                             @endphp
                             <div class="cursor-zoom-in hover:scale-110 transition-transform active:scale-95"
                                 @click="$dispatch('preview-image', { url: '{{ $avatarUrl }}', title: '{{ $user->full_name }}' })">
-                                
-                                <x-avatar 
-                                    size="w-10 h-10" 
-                                    rounded="lg" 
-                                    :src="$avatarUrl" 
+
+                                <x-avatar
+                                    size="w-10 h-10"
+                                    rounded="lg"
+                                    :src="$avatarUrl"
                                 />
                             </div>
                             <div class="flex flex-col">
                                 <span class="text-base font-black leading-tight text-base-content">{{ $user->full_name }}</span>
                                 <span class="text-xs opacity-50 lowercase">{{ $user->email }}</span>
-                                
+
                                 {{-- Username & Status Row --}}
                                 <div class="flex items-center gap-2 mt-2">
                                     <span class="text-[10px] font-bold text-primary uppercase tracking-tighter">@ {{ $user->username }}</span>
                                     <span class="opacity-20">•</span>
-                                    <x-badge 
-                                        flat 
-                                        :positive="$user->status === 'active'" 
-                                        :warning="$user->status !== 'active'" 
-                                        label="{{ $user->status }}" 
-                                        class="text-[8px] font-black uppercase px-1.5 h-4" 
+                                    <x-badge
+                                        flat
+                                        :positive="$user->status === 'active'"
+                                        :warning="$user->status !== 'active'"
+                                        label="{{ $user->status }}"
+                                        class="text-[8px] font-black uppercase px-1.5 h-4"
                                     />
                                 </div>
                             </div>
@@ -326,7 +326,7 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
                             <x-button xs secondary flat icon="pencil-square" label="Edit" wire:click="openEditModal('{{ $user->id }}')" />
                             <x-button xs :warning="$user->status === 'active'" flat icon="no-symbol" label="Status" wire:click="toggleStatus('{{ $user->id }}')" />
                         </div>
-                        
+
                         <x-button xs negative flat icon="trash" label="Delete" wire:click="deleteUser('{{ $user->id }}')" />
                     </div>
                 </div>
@@ -344,11 +344,11 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
     {{-- MODAL --}}
     <x-modal-card title="{{ $selected_id ? 'Edit User Profile' : 'Create New Account' }}" wire:model="userModal" z-index="z-50" rounded="3xl">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            
+
             {{-- 1. Name Fields --}}
             <x-input label="First Name" wire:model="first_name" placeholder="John" />
             <x-input label="Last Name" wire:model="last_name" placeholder="Doe" />
-            
+
             <div class="sm:col-span-2">
                 <x-input label="Middle Name (Optional)" wire:model="middle_name" />
             </div>
@@ -388,13 +388,13 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
 
                 {{-- Restricted Password Field --}}
                 <div class="relative group border-t border-base-200 pt-4">
-                    <x-password 
-                        label="{{ $selected_id ? 'Change Password' : 'Set Password' }}" 
-                        wire:model="password" 
+                    <x-password
+                        label="{{ $selected_id ? 'Change Password' : 'Set Password' }}"
+                        wire:model="password"
                         placeholder="••••••••"
                         :disabled="!$isSuperAdmin"
                     />
-                    
+
                     @if($isSuperAdmin)
                         @if($selected_id)
                             <p class="mt-1 text-[10px] opacity-50 italic">Leave blank to keep current password.</p>
@@ -416,7 +416,7 @@ new #[Layout('layouts.app', ['title' => 'Users'])] class extends Component
         </x-slot>
     </x-modal-card>
 
-    
-    
-    
+
+
+
 </x-main-container>

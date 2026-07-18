@@ -29,6 +29,7 @@
         </style>
     </head>
     <body class="bg-base-100 antialiased">
+        <x-dialog z-index="z-50" blur="sm" />
         <x-notifications z-index="z-50" />
         {{ $slot }}
         @livewireScripts

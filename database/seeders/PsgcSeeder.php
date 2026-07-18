@@ -45,14 +45,11 @@ class PsgcSeeder extends Seeder
         $map = [];
 
         foreach ($rows as $row) {
-            $id = DB::table('regions')->insertGetId([
-                'code'       => $row['code'],
-                'name'       => $row['name'],
-                'short_name' => $row['short_name'] ?: null,
+            $id = $this->upsert('regions', ['code' => $row['code']], [
+                'name'        => $row['name'],
+                'short_name'  => $row['short_name'] ?: null,
                 'island_group' => $row['island_group'] ?: null,
-                'status'     => $row['status'] ?? 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
+                'status'      => $row['status'] ?? 'active',
             ]);
             $map[$row['code']] = $id;
         }
@@ -67,14 +64,11 @@ class PsgcSeeder extends Seeder
         $map = [];
 
         foreach ($rows as $row) {
-            $id = DB::table('provinces')->insertGetId([
-                'code'       => $row['code'],
+            $id = $this->upsert('provinces', ['code' => $row['code']], [
                 'name'       => $row['name'],
                 'region_id'  => $regionMap[$row['region_code']] ?? null,
                 'old_name'   => $row['old_name'] ?: null,
                 'status'     => $row['status'] ?? 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
             $map[$row['code']] = $id;
         }
@@ -89,18 +83,15 @@ class PsgcSeeder extends Seeder
         $map = [];
 
         foreach ($rows as $row) {
-            $id = DB::table('city_municipalities')->insertGetId([
-                'code'        => $row['code'],
-                'name'        => $row['name'],
-                'province_id' => $provinceMap[$row['province_code']] ?? null,
-                'region_id'   => $regionMap[$row['region_code']] ?? null,
-                'type'        => $row['type'],
-                'income_class' => $row['income_class'] ?: null,
-                'urban_rural'  => $row['urban_rural'] ?: null,
-                'old_name'     => $row['old_name'] ?: null,
-                'status'       => $row['status'] ?? 'active',
-                'created_at'   => now(),
-                'updated_at'   => now(),
+            $id = $this->upsert('city_municipalities', ['code' => $row['code']], [
+                'name'          => $row['name'],
+                'province_id'   => $provinceMap[$row['province_code']] ?? null,
+                'region_id'     => $regionMap[$row['region_code']] ?? null,
+                'type'          => $row['type'],
+                'income_class'  => $row['income_class'] ?: null,
+                'urban_rural'   => $row['urban_rural'] ?: null,
+                'old_name'      => $row['old_name'] ?: null,
+                'status'        => $row['status'] ?? 'active',
             ]);
             $map[$row['code']] = $id;
         }
@@ -115,7 +106,7 @@ class PsgcSeeder extends Seeder
         $batch = [];
         $batchSize = 500;
 
-        foreach ($rows as $i => $row) {
+        foreach ($rows as $row) {
             $batch[] = [
                 'code'                   => $row['code'],
                 'name'                   => $row['name'],
@@ -124,21 +115,70 @@ class PsgcSeeder extends Seeder
                 'region_id'              => $regionMap[$row['region_code']] ?? null,
                 'old_name'               => $row['old_name'] ?: null,
                 'status'                 => $row['status'] ?? 'active',
-                'created_at'             => now(),
-                'updated_at'             => now(),
             ];
 
             if (count($batch) >= $batchSize) {
-                DB::table('barangays')->insert($batch);
+                $this->upsertBatch('barangays', $batch);
                 $batch = [];
             }
         }
 
         if ($batch) {
-            DB::table('barangays')->insert($batch);
+            $this->upsertBatch('barangays', $batch);
         }
 
         $this->command->info("Seeded {$this->count('barangays')} barangays");
+    }
+
+    /**
+     * Insert or update a row keyed on $unique, returning the record id.
+     */
+    private function upsert(string $table, array $unique, array $values): int
+    {
+        $existing = DB::table($table)->where($unique)->first();
+
+        if ($existing) {
+            DB::table($table)->where('id', $existing->id)->update(
+                array_merge($values, ['updated_at' => now()])
+            );
+            return $existing->id;
+        }
+
+        return DB::table($table)->insertGetId(array_merge($unique, $values, [
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]));
+    }
+
+    /**
+     * Batch insert-or-update keyed on the 'code' column.
+     */
+    private function upsertBatch(string $table, array $rows): void
+    {
+        $codes = array_column($rows, 'code');
+        $existing = DB::table($table)->whereIn('code', $codes)->pluck('id', 'code');
+
+        $toInsert = [];
+        $toUpdate = [];
+
+        foreach ($rows as $row) {
+            if ($existing->has($row['code'])) {
+                $toUpdate[$existing[$row['code']]] = $row;
+            } else {
+                $row['created_at'] = now();
+                $toInsert[] = $row;
+            }
+        }
+
+        if ($toInsert) {
+            DB::table($table)->insert($toInsert);
+        }
+
+        foreach ($toUpdate as $id => $row) {
+            DB::table($table)->where('id', $id)->update(
+                array_merge($row, ['updated_at' => now()])
+            );
+        }
     }
 
     private function count(string $table): int

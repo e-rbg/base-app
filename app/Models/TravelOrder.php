@@ -6,6 +6,13 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use BaconQrCode\Writer;
+use BaconQrCode\Renderer\GDLibRenderer;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Encoder\Encoder;
+use BaconQrCode\Common\ErrorCorrectionLevel;
 use EdeesonOpina\PsgcApi\Models\Barangay;
 
 class TravelOrder extends Model
@@ -82,6 +89,37 @@ class TravelOrder extends Model
 
         // Fallback for free-text entries (regional/national destinations)
         return $this->destination;
+    }
+
+    /**
+     * Generate QR code PNG from a raw esignature hash string.
+     * Used for displaying the approver's/recommender's QR on documents.
+     */
+    public static function generateQrFromHash(?string $hash): ?string
+    {
+        if (empty($hash)) {
+            return null;
+        }
+
+        $renderer = new GDLibRenderer(300);
+        $writer = new Writer($renderer);
+        $pngData = $writer->writeString(
+            $hash,
+            Encoder::DEFAULT_BYTE_MODE_ENCODING,
+            ErrorCorrectionLevel::H()
+        );
+
+        $resource = imagecreatefromstring($pngData);
+        if ($resource === false) {
+            return 'data:image/png;base64,' . base64_encode($pngData);
+        }
+
+        ob_start();
+        imagepng($resource);
+        $finalPng = ob_get_clean();
+        imagedestroy($resource);
+
+        return 'data:image/png;base64,' . base64_encode($finalPng);
     }
 }
 

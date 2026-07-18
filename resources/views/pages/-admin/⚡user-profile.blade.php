@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Models\DigitalSignature;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,7 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
     public string $username = '';
     public string $email = '';
     public string $timezone = 'UTC';
-    public string $theme = 'light'; // Added missing property
+    public string $theme = 'light';
     public $photo; 
     public ?string $enteredCode = null;
     public string $current_password = '';
@@ -31,6 +32,11 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
     public string $new_password_confirmation = '';
     public string $secret_code_input = '';
     public string $confirm_secret_code = '';
+
+    // Digital Signature Properties
+    public string $signature_label = '';
+    public string $signature_secret_code = '';
+    public string $signature_confirm_code = '';
 
     public function mount()
     {
@@ -45,7 +51,7 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
         $this->theme       = $this->user->profile->preferences['theme'] ?? 'light';
     }
 
-    public function updateTheme(string $theme) // Changed from variable to public function
+    public function updateTheme(string $theme)
     {
         $this->user->profile->update([
             'preferences->theme' => $theme,
@@ -67,8 +73,6 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
 
         if ($this->email !== $this->user->email) {
             $this->requestEmailChange();
-            // Important: Reset the local email property to the OLD one 
-            // until the new one is actually verified.
             $this->email = $this->user->email; 
         }
 
@@ -122,7 +126,7 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                 $this->user->forceFill([
                     'email' => $this->user->unverified_email,
                     'unverified_email' => null,
-                    'verification_code' => null, // Clear the code
+                    'verification_code' => null,
                     'email_verified_at' => now(),
                 ])->save();
             });
@@ -139,7 +143,7 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
     public function updatePassword()
     {
         $this->validate([
-            'current_password' => ['required', 'current_password'], // Validates against auth user
+            'current_password' => ['required', 'current_password'],
             'new_password'     => ['required', 'confirmed', Password::min(8)],
         ]);
 
@@ -179,14 +183,90 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
         );
     }
 
+    public function generateDigitalSignature()
+    {
+        $this->validate([
+            'signature_label'       => 'nullable|string|max:255',
+            'signature_secret_code' => 'required|string|min:6',
+            'signature_confirm_code'=> 'required|same:signature_secret_code',
+        ]);
+
+        $hash = $this->user->generateEsignature($this->signature_secret_code);
+
+        $this->user->digitalSignatures()->create([
+            'label'            => $this->signature_label ?: 'Signature ' . ($this->user->digitalSignatures()->count() + 1),
+            'esignature_hash'  => $hash,
+            'is_active'        => !$this->user->digitalSignatures()->exists(),
+        ]);
+
+        $this->reset(['signature_label', 'signature_secret_code', 'signature_confirm_code']);
+
+        $this->notification()->success(
+            title: 'Signature Created',
+            description: 'Your new digital signature has been generated.'
+        );
+    }
+
+    public function activateSignature(string $id)
+    {
+        $signature = DigitalSignature::where('user_id', $this->user->id)->findOrFail($id);
+
+        $this->user->digitalSignatures()->update(['is_active' => false]);
+        $signature->update(['is_active' => true]);
+
+        $this->notification()->success('Signature Activated', 'This signature is now your active signing key.');
+    }
+
+    public function deleteSignature(string $id)
+    {
+        $signature = DigitalSignature::where('user_id', $this->user->id)->findOrFail($id);
+
+        if (!$this->user->isSuperAdmin()) {
+            return $this->notification()->error('Unauthorized', 'Only super admins can delete signatures.');
+        }
+
+        if ($signature->isInUse()) {
+            return $this->notification()->error('Cannot Delete', 'This signature is in use by an approved travel order.');
+        }
+
+        $this->dialog()->confirm([
+            'title'       => 'Delete Signature?',
+            'description' => 'This will permanently remove the signature "' . $signature->label . '".',
+            'icon'        => 'trash',
+            'accept'      => [
+                'label'  => 'Delete',
+                'color'  => 'negative',
+                'method' => 'performDeleteSignature',
+                'params' => $id,
+            ],
+            'reject' => [
+                'label' => 'Cancel',
+            ],
+        ]);
+    }
+
+    public function performDeleteSignature(string $id)
+    {
+        $signature = DigitalSignature::where('user_id', $this->user->id)->findOrFail($id);
+
+        if (!$this->user->isSuperAdmin()) {
+            return $this->notification()->error('Unauthorized', 'Only super admins can delete signatures.');
+        }
+
+        if ($signature->isInUse()) {
+            return $this->notification()->error('Cannot Delete', 'This signature is in use by an approved travel order.');
+        }
+
+        $signature->delete();
+
+        $this->notification()->success('Deleted', 'Signature has been removed.');
+    }
+
     public function getHasEsignatureProperty(): bool
     {
         return !empty($this->user->esignature);
     }
 
-    /**
-     * Check if the general information has changed.
-     */
     public function getIsDirtyProperty(): bool
     {
         return $this->first_name  !== ($this->user->profile->first_name ?? '') ||
@@ -197,9 +277,6 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
                $this->timezone    !== ($this->user->profile->timezone ?? 'UTC');
     }
 
-    /**
-     * Check if the password fields are ready to be submitted.
-     */
     public function getCanUpdatePasswordProperty(): bool
     {
         return !empty($this->current_password) && 
@@ -215,276 +292,226 @@ new #[Layout('layouts.app', ['title' => 'User Profile'])] class extends Componen
         ['url' => route('admin.dashboard'), 'label' => 'Dashboard'],
         ['label' => $this->user->initialed_name . '\'s Profile']
     ]"
-    wire:model.live.debounce.300ms="search"
 >
-    <div class="grid grid-cols-1 gap-6">
-        <!-- MAIN CONTENT -->
-        <div class="py-5 px-4">
-            <div class="space-y-10">
-                
-                {{-- Header Section --}}
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h1 class="sm:text-3xl text-lg font-black text-base-content tracking-tight">Account Settings</h1>
-                        <p class="text-base-content/50">Manage your profile and security preferences.</p>
-                    </div>
-                    {{-- Status indicator based on your ENUM --}}
-                    <div class="flex items-center">
-                        <x-badge :color="$user->status === 'active' ? 'positive' : 'warning'" 
-                                label="{{ strtoupper($user->status) . ' : ' . strtoupper($user->role) }}" 
-                                flat 
-                                class="font-bold" />
-                        
-                    </div>
-                </div>
+    {{-- Profile Header --}}
+    <div class="flex flex-col sm:flex-row items-center gap-5 mb-8">
+        <div class="relative group flex-shrink-0">
+            <x-avatar size="w-24 h-24" rounded="3xl"
+                src="{{ $user->profile->avatar ? asset('storage/'.$user->profile->avatar) : 'https://ui-avatars.com/api/?name='.urlencode($user->initialed_name).'&background=random&bold=true&size=128' }}"
+                class="ring-4 ring-base-200 shadow-lg"
+            />
+            <label class="absolute inset-0 flex items-center justify-center bg-black/40 rounded-3xl opacity-0 group-hover:opacity-100 cursor-pointer transition-all">
+                <x-icon name="camera" class="w-6 h-6 text-white" />
+                <input type="file" wire:model="photo" class="hidden" accept="image/*" />
+            </label>
+        </div>
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl font-black">{{ $user->full_name }}</h1>
+                @if($user->email_verified_at)
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-bold uppercase">
+                        <x-icon name="check-badge" mini class="w-3 h-3" /> Verified
+                    </span>
+                @endif
+                <x-badge :color="$user->status === 'active' ? 'positive' : 'warning'" label="{{ strtoupper($user->role) }}" flat class="font-bold" />
+            </div>
+            <p class="text-sm text-base-content/50 font-mono">{{ '@' . $user->username }}</p>
+            @if($user->profile->position)
+                <p class="text-sm text-base-content/60 mt-0.5">{{ $user->profile->position }} — {{ $user->profile->area_of_assignment }}</p>
+            @endif
+        </div>
+    </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    
-                    {{-- Left: Sidebar/Avatar --}}
-                    <div class="space-y-6">
-                        <div class="bg-base-100 rounded-[2.5rem] p-8 text-center shadow-xl">
-                            <div class="relative inline-block group">
-                                <x-avatar size="w-32 h-32" rounded="3xl"
-                                    src="{{ $user->profile->avatar ? asset('storage/'.$user->profile->avatar) : 'https://ui-avatars.com/api/?name='.urlencode($user->initialed_name).'&background=random' }}"
-                                    class="ring-8 ring-base-200 group-hover:ring-primary/20 transition-all duration-500"
-                                />
-                                <label class="absolute inset-0 flex items-center justify-center bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 cursor-pointer transition-all">
-                                    <x-icon name="photo" class="w-8 h-8 text-white" />
-                                    <input type="file" wire:model="photo" class="hidden" />
-                                </label>
-                            </div>
-                            <h2 class="mt-4 font-bold font-roboto text-xl">{{ $user->full_name }}</h2>
-                            <p class="text-xs opacity-40 font-bold tracking-widest mt-1"><span>@</span>{{ $user->username }}</p>
+    {{-- Tabs --}}
+    <div x-data="{ tab: 'overview' }">
+        <div class="border-b border-base-200 flex gap-0 overflow-x-auto">
+            <button @click="tab = 'overview'" :class="tab === 'overview' ? 'border-primary text-primary' : 'border-transparent text-base-content/50 hover:text-base-content/80'" class="flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap">
+                <x-icon name="user" class="w-4 h-4" /> Overview
+            </button>
+            <button @click="tab = 'security'" :class="tab === 'security' ? 'border-primary text-primary' : 'border-transparent text-base-content/50 hover:text-base-content/80'" class="flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap">
+                <x-icon name="shield-check" class="w-4 h-4" /> Security
+            </button>
+            <button @click="tab = 'signatures'" :class="tab === 'signatures' ? 'border-primary text-primary' : 'border-transparent text-base-content/50 hover:text-base-content/80'" class="flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap">
+                <x-icon name="key" class="w-4 h-4" /> Signatures
+            </button>
+            <button @click="tab = 'appearance'" :class="tab === 'appearance' ? 'border-primary text-primary' : 'border-transparent text-base-content/50 hover:text-base-content/80'" class="flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap">
+                <x-icon name="paint-brush" class="w-4 h-4" /> Appearance
+            </button>
+        </div>
+
+        <div class="py-8">
+
+            {{-- OVERVIEW --}}
+            <div x-show="tab === 'overview'" x-transition>
+                <x-card rounded="3xl" shadow="none" class="border-base-200">
+                    <form wire:submit="updateGeneralInfo" class="space-y-5">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <x-input label="First Name" wire:model.live.blur="first_name" icon="user" />
+                            <x-input label="Last Name" wire:model.live.blur="last_name" />
                         </div>
+                        <x-input label="Middle Name" wire:model.live.blur="middle_name" placeholder="Optional" />
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <x-input label="Username" prefix="@" wire:model.live.blur="username" />
+                            <x-input label="Email" icon="envelope" wire:model.live.blur="email" />
+                        </div>
+                        <x-select label="Timezone" wire:model="timezone" :options="['UTC', 'PST', 'Asia/Manila', 'EST', 'GMT']" />
 
-                        {{-- Verification Status (from your schema email_verified_at) --}}
-                        {{-- Verification Status --}}
-                        <div class="bg-primary/5 rounded-3xl p-6 border border-primary/10">
-                            <div class="flex items-center justify-between mb-4">
-                                <h4 class="text-xs font-black uppercase tracking-widest text-primary">Account Security</h4>
-                                
-                                {{-- Status Badge --}}
-                                @if($user->email_verified_at)
-                                    <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                                        <x-icon name="check-badge" mini class="w-3.5 h-3.5" />
-                                        <span class="text-[10px] font-bold uppercase tracking-wider">Verified</span>
-                                    </div>
-                                @else
-                                    <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                                        <x-icon name="exclamation-circle" class="w-3.5 h-3.5" />
-                                        <span class="text-[10px] font-bold uppercase tracking-wider">Unverified</span>
-                                    </div>
-                                @endif
-                            </div>
-
-                            <div class="space-y-4">
-                                {{-- <x-input label="Email Address" icon="envelope" wire:model="email" /> --}}
-
-                                {{-- Show this ONLY if there is a pending change --}}
-                                @if($user->unverified_email)
-                                    <div class="bg-primary/5 border border-primary/20 rounded-2xl p-4 animate-pulse-slow">
-                                        <div class="flex items-start gap-3">
-                                            <x-icon name="information-circle" class="w-5 h-5 text-primary mt-0.5" />
-                                            <div class="flex-1">
-                                                <p class="text-xs font-bold text-primary uppercase tracking-widest">Action Required</p>
-                                                <p class="text-sm text-base-content/70 mt-1">
-                                                    We sent a code to <span class="font-bold text-base-content">{{ $user->unverified_email }}</span>. 
-                                                    Enter it below to confirm your new email.
-                                                </p>
-                                                
-                                                <div class="mt-4 flex items-end gap-2">
-                                                    <x-input 
-                                                        placeholder="000000" 
-                                                        wire:model="enteredCode" 
-                                                        x-mask="999999"
-                                                        class="text-center tracking-[0.5em] font-mono text-lg"
-                                                    />
-                                                    <x-button 
-                                                        primary 
-                                                        label="Verify Code" 
-                                                        wire:click="confirmEmailChange" 
-                                                        spinner="confirmEmailChange" 
-                                                    />
-                                                </div>
-                                            </div>
+                        @if($user->unverified_email)
+                            <div class="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4">
+                                <div class="flex items-start gap-3">
+                                    <x-icon name="information-circle" class="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <div class="flex-1">
+                                        <p class="text-xs font-bold text-amber-600 uppercase tracking-wider">Verify New Email</p>
+                                        <p class="text-sm text-base-content/60 mt-1">A code was sent to <span class="font-semibold">{{ $user->unverified_email }}</span></p>
+                                        <div class="mt-3 flex items-end gap-2">
+                                            <x-input placeholder="000000" wire:model="enteredCode" x-mask="999999" class="text-center tracking-[0.5em] font-mono text-lg max-w-[160px]" />
+                                            <x-button primary label="Verify" wire:click="confirmEmailChange" spinner="confirmEmailChange" />
                                         </div>
                                     </div>
-                                @endif
+                                </div>
                             </div>
+                        @endif
+
+                        <div class="flex justify-end pt-2">
+                            <x-button type="submit" primary label="Save Changes" spinner="updateGeneralInfo" class="rounded-xl px-8" :disabled="!$this->isDirty" />
                         </div>
-                    </div>
+                    </form>
+                </x-card>
+            </div>
 
-                    {{-- Right: Profile Form --}}
-                    <div class="lg:col-span-2 space-y-6">
-                        <h1 class="sm:text-xl text-lg font-black text-base-800 tracking-tight sm:uppercase mb-6">Manage your Profile</h1>
-                        <x-card title="Personal Information" rounded="3xl" shadow="none" class="border-base-200 bg-base-100 dark:bg-base-300">
-                            <form wire:submit="updateGeneralInfo" class="space-y-6">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <x-input label="First Name" wire:model.live.blur="first_name" />
-                                    <x-input label="Last Name" wire:model.live.blur="last_name" />
-                                </div>
-                                
-                                <x-input label="Middle Name (Optional)" wire:model.live.blur="middle_name" />
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-base-200 pt-6 mt-6">
-                                    <x-input label="Username" prefix="@" wire:model.live.blur="username" />
-                                    <x-input label="Email Address" icon="envelope" wire:model.live.blur="email" />
-                                </div>
-
-                                <x-select
-                                    label="Timezone"
-                                    placeholder="Select Timezone"
-                                    wire:model="timezone"
-                                    :options="['UTC', 'PST', 'Asia/Manila', 'EST', 'GMT']"
-                                />
-
-                                {{-- <div class="flex justify-end pt-4">
-                                    <x-button type="submit" primary label="Save All Changes" spinner="updateGeneralInfo" class="rounded-xl px-10" />
-                                </div> --}}
-                                <div class="flex justify-end pt-4">
-                                    <x-button 
-                                            type="submit" 
-                                            primary 
-                                            label="Save All Changes" 
-                                            spinner="updateGeneralInfo" 
-                                            class="rounded-xl px-10" 
-                                            :disabled="!$this->isDirty" 
-                                        />
-                                </div>
-                            </form>
-                        </x-card>
-
-                        {{-- Theme Preferences (using the JSON column) --}}
-                        <div class="mt-10 border-t border-error/20 pt-10">
-                            <h1 class="sm:text-xl font-black text-lg text-base-800 tracking-tight sm:uppercase mb-6">Manage your Theme</h1>
-                            {{-- Status Indicator --}}
-                            <x-card title="Preferences" rounded="3xl" shadow="none" class="border-base-200">
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-[10px] font-bold uppercase tracking-tighter opacity-40 py-5">Current : </span>
-                                    <div class="h-2 w-2 rounded-full bg-primary animate-pulse mr-2"></div>
-                                    <span class="text-[10px] font-bold uppercase tracking-tighter opacity-40" x-text="theme"></span>
-                                </div>
-                                <div class="flex items-center gap-4">
-                                    <x-button outline interaction="positive" secondary label="Light Mode" icon="sun" wire:click="updateTheme('light')" />
-                                    <x-button solid secondary label="Dark Mode" icon="moon" wire:click="updateTheme('dark')" />
-                                    <x-button  @click="localStorage.removeItem('theme'); location.reload();">
-                                        Use System Settings
-                                    </x-button>
-                                </div>
-                            </x-card>
+            {{-- SECURITY --}}
+            <div x-show="tab === 'security'" x-transition x-cloak>
+                <x-card rounded="3xl" shadow="none" class="border-base-200">
+                    <form wire:submit="updatePassword" class="space-y-5">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <x-password label="Current Password" wire:model.live.blur="current_password" placeholder="Enter current" />
+                            <x-password label="New Password" wire:model.live.blur="new_password" placeholder="Min. 8 characters" />
+                            <x-password label="Confirm New" wire:model.live.blur="new_password_confirmation" placeholder="Repeat new" />
                         </div>
-                        <div class="my-10 border-t border-error/20 pt-10">
-                            <h1 class="sm:text-xl text-lg font-black text-base-800 tracking-tight sm:uppercase mb-6">Security Credentials</h1>
-                            
-                            <div class="grid grid-cols-1 gap-6">
-                                {{-- Change Password Card --}}
-                                <x-card title="Change Password" rounded="3xl" shadow="none" class="border-base-200">
-                                    <form wire:submit="updatePassword" class="space-y-4">
-                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <x-password 
-                                                label="Current Password" 
-                                                wire:model.live.blur="current_password" 
-                                                placeholder="••••••••" 
-                                            />
-                                            <x-password 
-                                                label="New Password" 
-                                                wire:model.live.blur="new_password" 
-                                                placeholder="••••••••" 
-                                            />
-                                            <x-password 
-                                                label="Confirm New Password" 
-                                                wire:model.live.blur="new_password_confirmation" 
-                                                placeholder="••••••••" 
-                                            />
-                                        </div>
-                                        
-                                        <div class="flex justify-end mt-4">
-                                            <x-button 
-                                                type="submit" 
-                                                negative 
-                                                outline 
-                                                label="Update Password" 
-                                                spinner="updatePassword" 
-                                                class="rounded-xl px-8"
-                                                :disabled="!$this->canUpdatePassword"
-                                            />
-                                        </div>
-    
-                                    </form>
-                                </x-card>
+                        <div class="flex justify-end">
+                            <x-button type="submit" negative outline label="Update Password" spinner="updatePassword" class="rounded-xl px-8" :disabled="!$this->canUpdatePassword" />
+                        </div>
+                    </form>
+                </x-card>
+            </div>
 
+            {{-- SIGNATURES --}}
+            <div x-show="tab === 'signatures'" x-transition x-cloak>
+                <div class="space-y-6">
+                    @php $activeSig = $this->user->digitalSignatures()->where('is_active', true)->first(); @endphp
+                    <x-card rounded="3xl" shadow="none" class="border-base-200">
+                        @if($activeSig)
+                            <div class="bg-success/5 border border-success/20 rounded-2xl p-6">
+                                <div class="flex items-center gap-3 mb-4">
+                                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-success/10">
+                                        <x-icon name="check-badge" class="w-5 h-5 text-success" />
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-success">Active Signature</h3>
+                                        <p class="text-xs opacity-60">{{ $activeSig->label }}</p>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40 mb-2">Hash</p>
+                                        <div class="bg-base-100 rounded-xl p-4 font-mono text-xs break-all leading-relaxed">{{ $activeSig->formatted_hash }}</div>
+                                    </div>
+                                    <div>
+                                        <p class="text-[10px] font-bold uppercase tracking-widest text-base-content/40 mb-2">QR Code</p>
+                                        <div class="bg-base-100 rounded-xl p-4 flex items-center justify-center">
+                                            @if($qrCode = $activeSig->generateQrCodePng())
+                                                <img src="{{ $qrCode }}" alt="QR" class="h-24" />
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        @else
+                            <div class="text-center py-10">
+                                <div class="inline-flex h-14 w-14 items-center justify-center rounded-full bg-base-200 mb-3">
+                                    <x-icon name="key" class="w-7 h-7 opacity-40" />
+                                </div>
+                                <p class="text-sm opacity-50">No active signature. Create one below.</p>
+                            </div>
+                        @endif
+                    </x-card>
 
-                        {{-- Digital Signature Section --}}
-                        <div class="my-10 border-t border-error/20 pt-10">
-                            <h1 class="sm:text-xl text-lg font-black text-base-800 tracking-tight sm:uppercase mb-6">Digital Signature</h1>
-                            
-                            <div class="grid grid-cols-1 gap-6">
-                                <x-card title="E-Signature Generator" rounded="3xl" shadow="none" class="border-base-200">
-                                    @if($this->hasEsignature)
-                                        <div class="bg-success/5 border border-success/20 rounded-2xl p-6 mb-6">
-                                            <div class="flex items-center gap-3 mb-4">
-                                                <x-icon name="check-badge" class="w-6 h-6 text-success" />
-                                                <h3 class="font-bold text-success">Signature Active</h3>
-                                            </div>
-                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div>
-                                                    <p class="text-xs font-semibold mb-2 opacity-60">TEXT SIGNATURE</p>
-                                                    <div class="bg-base-200 rounded-xl p-4 font-mono text-sm break-all">
-                                                        {{ $user->formatted_esignature }}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <p class="text-xs font-semibold mb-2 opacity-60">QR CODE SIGNATURE</p>
-                                                    <div class="bg-base-200 rounded-xl p-4 flex items-center justify-center">
-                                                        @if($qrCode = $user->generateQrCodePng())
-                                                            <img src="{{ $qrCode }}" alt="E-signature QR code" class="h-24" />
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <p class="text-xs opacity-60 mt-2">Generated from your secret code and hash key.</p>
+                    <x-card rounded="3xl" shadow="none" class="border-base-200">
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-base-content/40 mb-4">Create New Signature</h3>
+                        <form wire:submit="generateDigitalSignature" class="space-y-4">
+                            <x-input label="Label" wire:model="signature_label" placeholder="e.g. Official Signature, PARPO II" />
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <x-password label="Secret Code" wire:model.live.blur="signature_secret_code" placeholder="Min. 6 characters" />
+                                <x-password label="Confirm Code" wire:model.live.blur="signature_confirm_code" placeholder="Re-enter" />
+                            </div>
+                            <div class="flex items-center gap-3 p-3 bg-warning/5 border border-warning/10 rounded-xl">
+                                <x-icon name="exclamation-triangle" class="w-4 h-4 text-warning flex-shrink-0" />
+                                <p class="text-xs text-warning/80">Keep your secret code confidential.</p>
+                            </div>
+                            <div class="flex justify-end">
+                                <x-button type="submit" primary outline label="Generate" icon="key" spinner="generateDigitalSignature" class="rounded-xl px-6" />
+                            </div>
+                        </form>
+                    </x-card>
+
+                    @php $signatures = $this->user->digitalSignatures()->latest()->get(); @endphp
+                    @if($signatures->count())
+                    <x-card rounded="3xl" shadow="none" class="border-base-200">
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-base-content/40 mb-4">All Signatures</h3>
+                        <div class="divide-y divide-base-200">
+                            @foreach($signatures as $sig)
+                                @php $inUse = $sig->isInUse(); @endphp
+                                <div class="flex items-center gap-4 py-4 first:pt-0 last:pb-0">
+                                    <input type="radio" name="active_signature" {{ $sig->is_active ? 'checked' : '' }}
+                                        wire:change="activateSignature('{{ $sig->id }}')"
+                                        class="radio radio-success radio-sm" />
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="font-bold text-sm">{{ $sig->label }}</span>
+                                            @if($sig->is_active)
+                                                <span class="badge badge-success badge-xs">Active</span>
+                                            @endif
+                                            @if($inUse)
+                                                <span class="badge badge-info badge-xs">In Use</span>
+                                            @endif
                                         </div>
+                                        <p class="font-mono text-xs opacity-50 truncate">{{ $sig->formatted_hash }}</p>
+                                        <p class="text-[11px] opacity-30 mt-0.5">Created {{ $sig->created_at->diffForHumans() }}</p>
+                                    </div>
+                                    @if($inUse)
+                                        <span class="opacity-30"><x-icon name="lock-closed" class="w-4 h-4" /></span>
+                                    @elseif($this->user->isSuperAdmin())
+                                        <x-button flat negative icon="trash" wire:click="deleteSignature('{{ $sig->id }}')" />
                                     @endif
-
-                                    <form wire:submit="generateEsignature" class="space-y-4">
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <x-password 
-                                                label="Secret Code" 
-                                                wire:model.live.blur="secret_code_input" 
-                                                placeholder="Min. 6 characters" 
-                                            />
-                                            <x-password 
-                                                label="Confirm Secret Code" 
-                                                wire:model.live.blur="confirm_secret_code" 
-                                                placeholder="Re-enter secret code" 
-                                            />
-                                        </div>
-                                        
-                                        <div class="flex items-center gap-3 p-4 bg-warning/10 border border-warning/20 rounded-xl">
-                                            <x-icon name="exclamation-triangle" class="w-5 h-5 text-warning flex-shrink-0" />
-                                            <p class="text-xs text-warning">Keep your secret code confidential. It is used to generate your unique digital signature.</p>
-                                        </div>
-
-                                        <div class="flex justify-end mt-4">
-                                            <x-button 
-                                                type="submit" 
-                                                primary 
-                                                outline
-                                                label="Generate Signature" 
-                                                icon="key"
-                                                spinner="generateEsignature" 
-                                                class="rounded-xl px-8"
-                                            />
-                                        </div>
-                                    </form>
-                                </x-card>
-                            </div>
+                                </div>
+                            @endforeach
                         </div>
-                    </div>
+                    </x-card>
+                    @endif
                 </div>
             </div>
+
+            {{-- APPEARANCE --}}
+            <div x-show="tab === 'appearance'" x-transition x-cloak>
+                <x-card rounded="3xl" shadow="none" class="border-base-200">
+                    <p class="text-sm font-bold mb-4">Theme Preference</p>
+                    <div class="flex items-center gap-3">
+                        <button wire:click="updateTheme('light')" 
+                            class="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all {{ $theme === 'light' ? 'border-primary bg-primary/5 text-primary' : 'border-base-200 text-base-content/50 hover:border-base-300' }}">
+                            <x-icon name="sun" class="w-4 h-4" /> Light
+                        </button>
+                        <button wire:click="updateTheme('dark')" 
+                            class="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all {{ $theme === 'dark' ? 'border-primary bg-primary/5 text-primary' : 'border-base-200 text-base-content/50 hover:border-base-300' }}">
+                            <x-icon name="moon" class="w-4 h-4" /> Dark
+                        </button>
+                        <button @click="localStorage.removeItem('theme'); location.reload();" 
+                            class="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-base-200 text-base-content/50 hover:border-base-300 transition-all">
+                            <x-icon name="computer-desktop" class="w-4 h-4" /> System
+                        </button>
+                    </div>
+                </x-card>
+            </div>
+
         </div>
     </div>
 </x-main-container>

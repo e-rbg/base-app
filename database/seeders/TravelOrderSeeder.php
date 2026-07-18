@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\StationOfficer;
 use App\Models\TravelOrder;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -18,6 +19,12 @@ class TravelOrderSeeder extends Seeder
             $this->command->warn('Skipping TravelOrderSeeder: elvonroy user not found. Run DatabaseSeeder first.');
             return;
         }
+
+        TravelOrder::where('user_id', $user->id)->forceDelete();
+
+        $station = 'DARMO-Mabini';
+        $approver = StationOfficer::where('station_code', $station)->first();
+        $recommender = StationOfficer::where('station_code', 'PBDD')->first();
 
         $barangays = DB::table('barangays')
             ->join('city_municipalities', 'barangays.city_municipality_id', '=', 'city_municipalities.id')
@@ -73,19 +80,19 @@ class TravelOrderSeeder extends Seeder
                     'travel_date'            => $travelDate->toDateString(),
                     'name'                   => 'Elvon Roy Gervacio',
                     'position'               => 'Agrarian Reform Program Technologist',
-                    'station'                => 'DARMO-Mabini',
+                    'station'                => $station,
                     'transportation_means'   => 'Land',
                     'vehicle_type'           => 'Government Vehicle',
                     'destination'            => $barangay,
                     'departure_date'         => $departureDate->toDateString(),
                     'return_date'            => $returnDate->toDateString(),
-                    'report_to'              => 'Greg L. Clarin',
+                    'report_to'              => $approver?->officer_name ?? 'William C. Abenales',
                     'purpose_of_trip'        => json_encode([$purposes[array_rand($purposes)]]),
                     'accommodation_type'     => 'Live-out',
-                    'recommending_approval'  => 'Precy S. Manla',
-                    'recommending_position'  => 'MARPO',
-                    'approved_by_name'       => 'Greg L. Clarin',
-                    'approved_by_position'   => 'MARPO',
+                    'recommending_approval'  => $recommender?->officer_name ?? 'Precy S. Manla',
+                    'recommending_position'  => $recommender?->position ?? 'MARPO/ OIC CARPO',
+                    'approved_by_name'       => $approver?->officer_name ?? 'William C. Abenales',
+                    'approved_by_position'   => $approver?->position ?? 'SARPO/OIC MARPO',
                     'fund_custodian'         => 'Maria Siezamie B. Agoilo',
                     'status'                 => $status,
                     'approved_at'            => null,

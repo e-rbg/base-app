@@ -21,24 +21,33 @@ class DatabaseSeeder extends Seeder
             StationOfficerSeeder::class,
         ]);
 
-        $superAdmin = User::create([
-            'username' => 'elvonroy',
-            'email' => 'elvonroy@example.com',
-            'password' => Hash::make('12345678'),
-            'role' => User::ROLE_SUPER_ADMIN,
-            'email_verified_at' => now(),
-        ]);
+        $superAdmin = User::updateOrCreate(
+            ['username' => 'elvonroy'],
+            [
+                'email' => 'elvonroy@example.com',
+                'password' => Hash::make('12345678'),
+                'role' => User::ROLE_SUPER_ADMIN,
+                'email_verified_at' => now(),
+            ]
+        );
 
-        $superAdmin->profile()->create([
-            'first_name' => 'Elvon',
-            'middle_name' => 'Roy',
-            'last_name' => 'Gervacio',
-        ]);
+        $superAdmin->profile()->updateOrCreate(
+            ['user_id' => $superAdmin->id],
+            [
+                'first_name' => 'Elvon',
+                'middle_name' => 'Roy',
+                'last_name' => 'Gervacio',
+            ]
+        );
 
-        User::factory()->create([
-            'username' => 'testuser',
-            'email' => 'test@example.com',
-        ]);
+        User::updateOrCreate(
+            ['username' => 'testuser'],
+            [
+                'email' => 'test@example.com',
+                'password' => Hash::make('password'),
+                'role' => User::ROLE_USER,
+            ]
+        );
 
         $this->call([
             TravelOrderSeeder::class,

@@ -95,6 +95,16 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(TravelOrder::class);
     }
 
+    public function digitalSignatures(): HasMany
+    {
+        return $this->hasMany(DigitalSignature::class);
+    }
+
+    public function activeSignature()
+    {
+        return $this->digitalSignatures()->where('is_active', true)->first();
+    }
+
     public function isSuperAdmin(): bool { return $this->role === self::ROLE_SUPER_ADMIN; }
     public function isAdmin(): bool      { return $this->role === self::ROLE_ADMIN; }
     public function isEditor(): bool     { return $this->role === self::ROLE_EDITOR; }

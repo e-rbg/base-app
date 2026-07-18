@@ -16,8 +16,8 @@
 
         {{-- Header --}}
         <div class="flex items-center justify-between border-b-2 border-black pb-4">
-            @if(file_exists(public_path('images/dar-logo.png')))
-                <img src="{{ asset('images/dar-logo.png') }}" class="h-16 w-auto">
+            @if(file_exists(storage_path('app/public/dar-logo.webp')))
+                <img src="{{ asset('storage/dar-logo.webp') }}" class="h-16 w-auto">
             @else
                 <div class="flex h-16 w-16 items-center justify-center border text-[8px]">DAR LOGO</div>
             @endif
@@ -27,8 +27,8 @@
                 <p class="m-0 text-sm font-semibold">Provincial Agrarian Reform Office</p>
                 <p class="m-0 text-xs">Davao de Oro</p>
             </div>
-            @if(file_exists(public_path('images/bagong-pilipinas-logo.png')))
-                <img src="{{ asset('images/bagong-pilipinas-logo.png') }}" class="h-16 w-auto">
+            @if(file_exists(storage_path('app/public/bagong-pilipinas-logo.png')))
+                <img src="{{ asset('storage/bagong-pilipinas-logo.png') }}" class="h-16 w-auto">
             @else
                 <div class="flex h-16 w-16 items-center justify-center border text-[8px]">BP LOGO</div>
             @endif
@@ -130,22 +130,21 @@
         <div class="mt-20 grid grid-cols-2 gap-10 text-center">
             @if($order->travel_type !== 'intra_municipal' && !empty($order->recommending_approval) && $order->recommending_approval !== 'N/A')
             <div>
-                <p class="mb-14 text-left text-[9px] font-bold uppercase text-gray-400">Recommending Approval:</p>
+                <p class="mb-5 text-left text-[9px] font-bold uppercase text-gray-400">Recommending Approval:</p>
                 <p class="border-b-2 border-black font-bold uppercase">{{ $order->recommending_approval }}</p>
-                <p class="text-xs italic">{{ $order->recommending_position }}</p>
                 @if($order->recommending_position)
-                    <p class="text-xs italic mt-1">{{ $order->recommending_position }}</p>
+                    <p class="text-xs italic">{{ $order->recommending_position }}</p>
                 @endif
             </div>
             @endif
             <div>
                 <p class="mb-5 text-left text-[9px] font-bold uppercase text-gray-400">Approved By:</p>
-                @if($order->status === 'approved' && $order->user && $order->user->esignature)
+                @if($order->status === 'approved' && $order->esignature_hash)
                     <div class="mb-2 w-1/4 flex flex-col justify-center items-center">
-                        @if($qrCode = $order->user->generateQrCodePng())
+                        @if($qrCode = \App\Models\TravelOrder::generateQrFromHash($order->esignature_hash))
                             <img src="{{ $qrCode }}" alt="E-signature QR code" width="100" height="100" />
                         @endif
-                        <p class="font-mono text-[8px] tracking-tight leading-none mt-1">{{ $order->user->esignature }}</p>
+                        <p class="font-mono text-[8px] tracking-tight leading-none mt-1">{{ $order->esignature_hash }}</p>
                     </div>
                 @endif
                 <p class="border-b-2 border-black font-bold uppercase">{{ $order->approved_by_name }}</p>

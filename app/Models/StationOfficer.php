@@ -12,6 +12,7 @@ class StationOfficer extends Model
     protected $fillable = [
         'station_code',
         'officer_name',
+        'academic_suffix',
         'position',
     ];
 

@@ -5,7 +5,7 @@
 - Laravel 12 / PHP ^8.2 / Livewire 4 / Tailwind CSS v4 / DaisyUI / WireUI
 - SQLite (dev + testing), Pest 4, DomPDF, Spatie Laravel PDF, Browsershot
 - PSGC API (`edeesonopina/laravel-psgc-api`) for Philippine barangay lookups
-- UUID primary keys (`HasUuids`) on all models; soft deletes on User, TravelOrder only (StationOfficer has no soft deletes)
+- UUID primary keys (`HasUuids`) on User, TravelOrder, StationOfficer; UserProfile uses integer PKs. Soft deletes on User, TravelOrder only (StationOfficer has no soft deletes)
 - User must verify email (`MustVerifyEmail`)
 
 ## Commands
@@ -36,11 +36,11 @@ This repo uses **Livewire 4 single-file components (SFC)**. Component PHP classe
 ## Directory Structure
 
 ```
-app/Models/          TravelOrder, User, UserProfile, StationOfficer (UUID PKs)
+app/Models/          TravelOrder, User, UserProfile, StationOfficer (UUID PKs on User, TravelOrder, StationOfficer; integer PK on UserProfile)
 app/Http/Controllers TravelOrderController, TravelOrderPrintController
 app/Mail/            VerifyNewEmail
 resources/views/
-  pages/-admin/      Dashboard, travel-orders, users, settings, help, etc.
+  pages/-admin/      Dashboard, travel-orders, users, settings, help, station-officers, user-profile, print-travel-order
   auth/              Login, register, logout, verify-email
   components/        Shared ⚡-prefixed Blade components
   layouts/           app.blade.php (sidebar wrapper), auth.blade.php, print.blade.php
@@ -60,10 +60,11 @@ database/seeders     StationOfficerSeeder, DatabaseSeeder
 ## Auth & Roles
 
 Roles on User model: `super_admin`, `admin`, `editor`, `user`
-- Admin panel routes protected by `can:access-admin-panels` middleware
-- `super_admin` sees soft-deleted records (via `Gate::before` in AppServiceProvider)
+- `access-admin-panels` gate allows `super_admin`, `admin`, `editor` (AppServiceProvider.php:27)
+- `Gate::before` grants `super_admin` everything, so `super_admin` sees soft-deleted records
 - `delete-content` gate: super_admin only
 - `manage-users` gate: super_admin + admin
+- Non-admin `editor` role shares the admin panel but cannot delete content or manage users
 - Guest routes: `/login`, `/register`
 
 ## Gotchas

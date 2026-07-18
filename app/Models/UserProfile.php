@@ -13,6 +13,9 @@ class UserProfile extends Model
         'first_name',
         'middle_name',
         'last_name',
+        'academic_suffix',
+        'position',
+        'area_of_assignment',
         'avatar',
         'timezone',
         'preferences',
@@ -37,7 +40,7 @@ class UserProfile extends Model
     public function fullName(): Attribute
     {
         return Attribute::make(
-            get: fn() => trim("{$this->first_name} {$this->middle_name} {$this->last_name}")
+            get: fn() => trim(preg_replace('/\s+/', ' ', "{$this->first_name} {$this->middle_name} {$this->last_name}"))
         );
     }
 
