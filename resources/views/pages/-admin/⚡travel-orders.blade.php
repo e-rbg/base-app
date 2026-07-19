@@ -25,7 +25,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     public $vehicle_type = 'Government Vehicle'; // Default to match PDF logic
     public $vehicle_details = '';
     
-    public $destination, $departure_date, $return_date, $report_to;
+    public $destination, $destination_province, $departure_date, $return_date, $report_to;
     public $purpose_of_trip = [];
     public $accommodation_type = 'Live-out'; // Capitalized to match PDF strict check
     public $approved_by_name;
@@ -54,6 +54,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             'all'           => $this->allTravelOrders(),
             'mine'          => $this->myTravelOrders(),
             'for_approval'  => $this->forApprovalOrders(),
+            'approved_by_me'=> $this->approvedByMeOrders(),
             'archived'      => $this->archivedTravelOrders(),
             default         => $this->myTravelOrders(),
         };
@@ -108,14 +109,39 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
     private function forApprovalOrders()
     {
         $user = auth()->user();
-        $fullName = $user->full_name;
+        $signatureHashes = $user->digitalSignatures()->pluck('esignature_hash');
+
+        // Get station officer names linked to this user for exact matching
+        $officerNames = StationOfficer::where('user_id', $user->id)
+            ->pluck('officer_name')
+            ->filter()
+            ->values()
+            ->toArray();
 
         $query = TravelOrder::query()->with('user')
-            ->where('status', 'pending')
-            ->where(function ($q) use ($fullName) {
-                $q->where('approved_by_name', 'like', "%{$fullName}%")
-                  ->orWhere('recommending_approval', 'like', "%{$fullName}%");
+            ->where('status', 'pending');
+
+        if (!empty($officerNames)) {
+            $query->where(function ($q) use ($officerNames) {
+                $q->whereIn('approved_by_name', $officerNames)
+                  ->orWhereIn('recommending_approval', $officerNames);
             });
+        } else {
+            // Fallback: fuzzy name match for users without station officer link
+            $searchPattern = str_replace(' ', '%', $user->full_name);
+            $query->where(function ($q) use ($searchPattern) {
+                $q->where('approved_by_name', 'like', "%{$searchPattern}%")
+                  ->orWhere('recommending_approval', 'like', "%{$searchPattern}%");
+            });
+        }
+
+        // Exclude orders the user has already recommended
+        if ($signatureHashes->isNotEmpty()) {
+            $query->where(function ($q) use ($signatureHashes) {
+                $q->whereNotIn('esignature_recommender_hash', $signatureHashes)
+                  ->orWhereNull('esignature_recommender_hash');
+            });
+        }
 
         if (! $user->isSuperAdmin()) {
             $query->where('user_id', '!=', $user->id);
@@ -136,9 +162,40 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         return $query->latest()->paginate(10);
     }
 
+    private function approvedByMeOrders()
+    {
+        $user = auth()->user();
+        $signatureHashes = $user->digitalSignatures()->pluck('esignature_hash');
+
+        if ($signatureHashes->isEmpty()) {
+            return TravelOrder::query()->with('user')->whereRaw('1 = 0')->paginate(10);
+        }
+
+        $query = TravelOrder::query()->with('user')
+            ->where('status', 'approved')
+            ->where(function ($q) use ($signatureHashes) {
+                $q->whereIn('esignature_hash', $signatureHashes)
+                  ->orWhereIn('esignature_recommender_hash', $signatureHashes);
+            });
+
+        if (!empty($this->statusFilter)) {
+            $query->whereIn('status', $this->statusFilter);
+        }
+
+        if ($this->search) {
+            $query->where(function ($q) {
+                $q->where('travel_order_no', 'like', "%{$this->search}%")
+                  ->orWhere('name', 'like', "%{$this->search}%")
+                  ->orWhere('destination', 'like', "%{$this->search}%");
+            });
+        }
+
+        return $query->latest()->paginate(10);
+    }
+
     private function archivedTravelOrders()
     {
-        $query = TravelOrder::withTrashed()->with('user');
+        $query = TravelOrder::onlyTrashed()->with('user');
 
         if ($this->search) {
             $query->where(function ($q) {
@@ -161,6 +218,37 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             $this->statusFilter[] = $status;
         }
         $this->resetPage();
+    }
+
+    #[Computed]
+    public function provinces(): array
+    {
+        $stationMunicipalityMap = [
+            'OPARO'                   => 'Nabunturan',
+            'LTID'                    => 'Nabunturan',
+            'PBDD'                    => 'Nabunturan',
+            'Administrative Division' => 'Nabunturan',
+            'Legal Division'          => 'Nabunturan',
+        ];
+
+        $currentTown = $stationMunicipalityMap[$this->station] ?? str_replace('DARMO-', '', $this->station);
+
+        $regionId = CityMunicipality::query()
+            ->where('name', $currentTown)
+            ->where('province_id', 58)
+            ->value('region_id');
+
+        if (!$regionId) {
+            return [];
+        }
+
+        return Province::query()
+            ->where('region_id', $regionId)
+            ->where('id', '!=', 58)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn($p) => ['id' => $p->id, 'name' => $p->name])
+            ->toArray();
     }
 
     protected function travelTypes(): array 
@@ -212,16 +300,52 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             : $data['name'];
     }
 
+    public function userMatchesOrder(string $approvedName): bool
+    {
+        if (empty($approvedName)) return false;
+
+        // Exact match against linked station officer names
+        $officerNames = StationOfficer::where('user_id', auth()->id())
+            ->pluck('officer_name')
+            ->toArray();
+
+        if (in_array($approvedName, $officerNames, true)) {
+            return true;
+        }
+
+        // Fallback: fuzzy name matching for legacy data
+        $user = auth()->user();
+        $normalize = fn($s) => strtolower(trim(preg_replace('/\s+/', ' ', $s)));
+        $clean = $normalize(str_replace('.', '', $user->full_name));
+        $approved = $normalize(str_replace('.', '', $approvedName));
+
+        if (str_contains($approved, $clean) || str_contains($clean, $approved)) return true;
+
+        $nameParts = explode(' ', $clean);
+        $approvedParts = explode(' ', $approved);
+
+        if (count($nameParts) === 2 && count($approvedParts) >= 3) {
+            return (bool) preg_match(
+                '/' . preg_quote($nameParts[0], '/') . '\s+.+' . preg_quote($nameParts[1], '/') . '/i',
+                $approved
+            );
+        }
+
+        return false;
+    }
+
     public function updatedStation($value)
     {
         // Important: Reset destination if they switch towns
         $this->destination = '';
+        $this->destination_province = '';
         $this->applyApprovalLogic();
     }
 
     public function updatedTravelType($value)
     {
         $this->destination = '';
+        $this->destination_province = '';
         $this->applyApprovalLogic();
     }
 
@@ -289,8 +413,8 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $user = auth()->user();
 
         $this->name = $user->full_name;
-        $this->position = $user->position ?? '';
-        $this->station = $user->station ?? 'DARMO-Mabini'; // Default
+        $this->position = $user->profile?->position ?? '';
+        $this->station = $user->stationOfficer?->station_code ?? $user->profile?->area_of_assignment ?? 'DARMO-Mabini';
 
         $year = now()->format('Y');
         $month = now()->format('m');
@@ -563,9 +687,12 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         }
 
         if ($this->travel_type === 'extra_municipal') {
+            $currentTown = $stationMunicipalityMap[$this->station] ?? str_replace('DARMO-', '', $this->station);
+
             $barangays = Barangay::query()
                 ->join('city_municipalities', 'barangays.city_municipality_id', '=', 'city_municipalities.id')
                 ->where('barangays.province_id', 58) // Davao de Oro
+                ->where('city_municipalities.name', '!=', $currentTown)
                 ->orderBy('city_municipalities.name')
                 ->orderBy('barangays.name')
                 ->get(['barangays.name', 'city_municipalities.name as municipality_name'])
@@ -580,25 +707,14 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         }
 
         if ($this->travel_type === 'regional') {
-            // Get the region and province of the selected station (scoped to Davao de Oro)
-            $currentTown = $stationMunicipalityMap[$this->station] ?? str_replace('DARMO-', '', $this->station);
-
-            $station = CityMunicipality::query()
-                ->where('name', $currentTown)
-                ->where('province_id', 58) // Davao de Oro
-                ->first(['province_id', 'region_id']);
-
-            if (!$station) {
+            if (!$this->destination_province) {
                 return [];
             }
 
-            // Get all barangays in the same region, excluding the station's province
             $destinations = Barangay::query()
                 ->join('city_municipalities', 'barangays.city_municipality_id', '=', 'city_municipalities.id')
                 ->join('provinces', 'city_municipalities.province_id', '=', 'provinces.id')
-                ->where('city_municipalities.region_id', $station->region_id)
-                ->where('city_municipalities.province_id', '!=', $station->province_id)
-                ->orderBy('provinces.name')
+                ->where('barangays.province_id', $this->destination_province)
                 ->orderBy('city_municipalities.name')
                 ->orderBy('barangays.name')
                 ->get(['barangays.name', 'city_municipalities.name as municipality_name', 'provinces.name as province_name'])
@@ -670,10 +786,27 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $order = TravelOrder::findOrFail($id);
         $user = auth()->user();
 
-        $isApprover = str_contains($order->approved_by_name, $user->full_name);
+        $isApprover = $this->userMatchesOrder($order->approved_by_name);
 
         if (!$isApprover) {
             return $this->notification()->error('Unauthorized', 'You are not a designated signatory for this Travel Order.');
+        }
+
+        $needsRecommendation = $order->travel_type !== 'intra_municipal' &&
+            !empty($order->recommending_approval) && $order->recommending_approval !== 'N/A';
+        $hasRecommended = !empty($order->recommending_approved_at);
+
+        if ($needsRecommendation && !$hasRecommended) {
+            return $this->dialog()->confirm([
+                'title'       => 'Recommendation Required',
+                'description' => 'This travel order must be recommended by the recommending authority before it can be approved. Please ensure the recommendation is completed first.',
+                'icon'        => 'exclamation-triangle',
+                'accept'      => [
+                    'label' => 'Understood',
+                    'color' => 'warning',
+                ],
+                'reject' => null,
+            ]);
         }
 
         $this->dialog()->confirm([
@@ -716,7 +849,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $order = TravelOrder::findOrFail($id);
         $user = auth()->user();
 
-        $isApprover = str_contains($order->approved_by_name, $user->full_name);
+        $isApprover = $this->userMatchesOrder($order->approved_by_name);
 
         if (!$isApprover) {
             return $this->notification()->error('Unauthorized', 'You are not a designated signatory for this Travel Order.');
@@ -734,7 +867,7 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
         $order = TravelOrder::findOrFail($id);
         $user = auth()->user();
 
-        $isRecommender = str_contains($order->recommending_approval, $user->full_name);
+        $isRecommender = $this->userMatchesOrder($order->recommending_approval);
 
         if (!$isRecommender) {
             return $this->notification()->error('Unauthorized', 'You are not the designated recommender for this Travel Order.');
@@ -887,6 +1020,10 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
             wire:click="setTab('for_approval')">
             <x-icon name="clipboard-document-check" class="w-4 h-4 shrink-0" /> For Approval
         </button>
+        <button role="tab" class="trapezoid-tab {{ $activeTab === 'approved_by_me' ? 'trapezoid-tab-active' : '' }}"
+            wire:click="setTab('approved_by_me')">
+            <x-icon name="check-badge" class="w-4 h-4 shrink-0" /> Approved by Me
+        </button>
         @if($isSuperAdmin)
             <button role="tab" class="trapezoid-tab {{ $activeTab === 'archived' ? 'trapezoid-tab-active' : '' }}"
                 wire:click="setTab('archived')">
@@ -972,6 +1109,18 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                                 <x-badge flat neutral label="Awaiting Recommender" icon="finger-print" class="ml-1" />
                             @endif
                         @endif
+                        @if($activeTab === 'approved_by_me' && $order->status === 'approved')
+                            @php
+                                $isApprover = $this->userMatchesOrder($order->approved_by_name);
+                                $isRecommender = $this->userMatchesOrder($order->recommending_approval) && $order->recommending_approval !== 'N/A';
+                            @endphp
+                            @if($isApprover)
+                                <x-badge flat success label="You Approved" icon="check-badge" class="ml-1" />
+                            @endif
+                            @if($isRecommender)
+                                <x-badge flat info label="You Recommended" icon="finger-print" class="ml-1" />
+                            @endif
+                        @endif
                     </td>
 
                     {{-- 2. NAME --}}
@@ -1044,8 +1193,8 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                                     $needsRecommendation = $order->travel_type !== 'intra_municipal' &&
                                         !empty($order->recommending_approval) && $order->recommending_approval !== 'N/A';
                                     $hasRecommended = !empty($order->recommending_approved_at);
-                                    $isRecommender = str_contains($order->recommending_approval, auth()->user()->full_name);
-                                    $isApprover = str_contains($order->approved_by_name, auth()->user()->full_name);
+                                    $isRecommender = $this->userMatchesOrder($order->recommending_approval);
+                                    $isApprover = $this->userMatchesOrder($order->approved_by_name);
                                     $isAdmin = auth()->user()->isSuperAdmin();
 
                                     // Recommend button: needs recommendation, not yet done, user is the named recommender
@@ -1130,9 +1279,15 @@ new #[Layout('layouts.app', ['title' => 'Travel Orders'])] class extends Compone
                     />
                     <x-select label="Scope of Travel" wire:model.live="travel_type" :options="$this->travelTypes()" option-label="name" option-value="id" searchable />
 
+                    @if($travel_type === 'regional')
+                        <div class="md:col-span-2">
+                            <x-select label="Province" placeholder="Select province..." wire:model.live="destination_province" :options="$this->provinces" option-label="name" option-value="id" searchable />
+                        </div>
+                    @endif
+
                     <div class="md:col-span-2">
                         @if(in_array($travel_type, ['intra_municipal', 'extra_municipal', 'regional', 'national']))
-                            <x-select label="Destination" placeholder="Search destination..." wire:model="destination" :options="$this->destinations()" option-label="full_label" option-value="name" searchable />
+                            <x-select label="Destination" placeholder="Search destination..." wire:model="destination" :options="$this->destinations()" option-label="full_label" option-value="name" searchable wire:key="dest-{{ $destination_province ?? 'scope-' . $travel_type }}" />
                         @endif
                     </div>
 

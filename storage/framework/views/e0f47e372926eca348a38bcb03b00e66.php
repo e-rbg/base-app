@@ -109,6 +109,31 @@ use WireUi\Traits\WireUiActions;
 <?php unset($__componentOriginal8fb227d09011c9831b75a18671cea295); ?>
 <?php endif; ?> For Approval
         </button>
+        <button role="tab" class="trapezoid-tab <?php echo e($activeTab === 'approved_by_me' ? 'trapezoid-tab-active' : ''); ?>"
+            wire:click="setTab('approved_by_me')">
+            <?php if (isset($component)) { $__componentOriginal8fb227d09011c9831b75a18671cea295 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal8fb227d09011c9831b75a18671cea295 = $attributes; } ?>
+<?php $component = WireUi\Components\Icon\Index::resolve(['name' => 'check-badge'] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('icon'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\WireUi\Components\Icon\Index::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'w-4 h-4 shrink-0']); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal8fb227d09011c9831b75a18671cea295)): ?>
+<?php $attributes = $__attributesOriginal8fb227d09011c9831b75a18671cea295; ?>
+<?php unset($__attributesOriginal8fb227d09011c9831b75a18671cea295); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal8fb227d09011c9831b75a18671cea295)): ?>
+<?php $component = $__componentOriginal8fb227d09011c9831b75a18671cea295; ?>
+<?php unset($__componentOriginal8fb227d09011c9831b75a18671cea295); ?>
+<?php endif; ?> Approved by Me
+        </button>
         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isSuperAdmin): ?>
             <button role="tab" class="trapezoid-tab <?php echo e($activeTab === 'archived' ? 'trapezoid-tab-active' : ''); ?>"
                 wire:click="setTab('archived')">
@@ -467,6 +492,60 @@ use WireUi\Traits\WireUiActions;
 <?php endif; ?>
                             <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                         <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($activeTab === 'approved_by_me' && $order->status === 'approved'): ?>
+                            <?php
+                                $isApprover = $this->userMatchesOrder($order->approved_by_name);
+                                $isRecommender = $this->userMatchesOrder($order->recommending_approval) && $order->recommending_approval !== 'N/A';
+                            ?>
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isApprover): ?>
+                                <?php if (isset($component)) { $__componentOriginalb3b4efb7fe41ab882e85629f7bd48655 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb3b4efb7fe41ab882e85629f7bd48655 = $attributes; } ?>
+<?php $component = WireUi\Components\Badge\Base::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('badge'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\WireUi\Components\Badge\Base::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['flat' => true,'success' => true,'label' => 'You Approved','icon' => 'check-badge','class' => 'ml-1']); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb3b4efb7fe41ab882e85629f7bd48655)): ?>
+<?php $attributes = $__attributesOriginalb3b4efb7fe41ab882e85629f7bd48655; ?>
+<?php unset($__attributesOriginalb3b4efb7fe41ab882e85629f7bd48655); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb3b4efb7fe41ab882e85629f7bd48655)): ?>
+<?php $component = $__componentOriginalb3b4efb7fe41ab882e85629f7bd48655; ?>
+<?php unset($__componentOriginalb3b4efb7fe41ab882e85629f7bd48655); ?>
+<?php endif; ?>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($isRecommender): ?>
+                                <?php if (isset($component)) { $__componentOriginalb3b4efb7fe41ab882e85629f7bd48655 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginalb3b4efb7fe41ab882e85629f7bd48655 = $attributes; } ?>
+<?php $component = WireUi\Components\Badge\Base::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('badge'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\WireUi\Components\Badge\Base::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['flat' => true,'info' => true,'label' => 'You Recommended','icon' => 'finger-print','class' => 'ml-1']); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginalb3b4efb7fe41ab882e85629f7bd48655)): ?>
+<?php $attributes = $__attributesOriginalb3b4efb7fe41ab882e85629f7bd48655; ?>
+<?php unset($__attributesOriginalb3b4efb7fe41ab882e85629f7bd48655); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginalb3b4efb7fe41ab882e85629f7bd48655)): ?>
+<?php $component = $__componentOriginalb3b4efb7fe41ab882e85629f7bd48655; ?>
+<?php unset($__componentOriginalb3b4efb7fe41ab882e85629f7bd48655); ?>
+<?php endif; ?>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
                     </td>
 
                     
@@ -689,8 +768,8 @@ use WireUi\Traits\WireUiActions;
                                     $needsRecommendation = $order->travel_type !== 'intra_municipal' &&
                                         !empty($order->recommending_approval) && $order->recommending_approval !== 'N/A';
                                     $hasRecommended = !empty($order->recommending_approved_at);
-                                    $isRecommender = str_contains($order->recommending_approval, auth()->user()->full_name);
-                                    $isApprover = str_contains($order->approved_by_name, auth()->user()->full_name);
+                                    $isRecommender = $this->userMatchesOrder($order->recommending_approval);
+                                    $isApprover = $this->userMatchesOrder($order->approved_by_name);
                                     $isAdmin = auth()->user()->isSuperAdmin();
 
                                     // Recommend button: needs recommendation, not yet done, user is the named recommender
@@ -991,6 +1070,33 @@ use WireUi\Traits\WireUiActions;
 <?php unset($__componentOriginal49b3de13d927faa5a3ecd49fc0b06061); ?>
 <?php endif; ?>
 
+                    <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($travel_type === 'regional'): ?>
+                        <div class="md:col-span-2">
+                            <?php if (isset($component)) { $__componentOriginal49b3de13d927faa5a3ecd49fc0b06061 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal49b3de13d927faa5a3ecd49fc0b06061 = $attributes; } ?>
+<?php $component = WireUi\Components\Select\Base::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('select'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\WireUi\Components\Select\Base::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Province','placeholder' => 'Select province...','wire:model.live' => 'destination_province','options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($this->provinces),'option-label' => 'name','option-value' => 'id','searchable' => true]); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal49b3de13d927faa5a3ecd49fc0b06061)): ?>
+<?php $attributes = $__attributesOriginal49b3de13d927faa5a3ecd49fc0b06061; ?>
+<?php unset($__attributesOriginal49b3de13d927faa5a3ecd49fc0b06061); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal49b3de13d927faa5a3ecd49fc0b06061)): ?>
+<?php $component = $__componentOriginal49b3de13d927faa5a3ecd49fc0b06061; ?>
+<?php unset($__componentOriginal49b3de13d927faa5a3ecd49fc0b06061); ?>
+<?php endif; ?>
+                        </div>
+                    <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+
                     <div class="md:col-span-2">
                         <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if(in_array($travel_type, ['intra_municipal', 'extra_municipal', 'regional', 'national'])): ?>
                             <?php if (isset($component)) { $__componentOriginal49b3de13d927faa5a3ecd49fc0b06061 = $component; } ?>
@@ -1002,7 +1108,7 @@ use WireUi\Traits\WireUiActions;
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\WireUi\Components\Select\Base::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['label' => 'Destination','placeholder' => 'Search destination...','wire:model' => 'destination','options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($this->destinations()),'option-label' => 'full_label','option-value' => 'name','searchable' => true]); ?>
+<?php $component->withAttributes(['label' => 'Destination','placeholder' => 'Search destination...','wire:model' => 'destination','options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($this->destinations()),'option-label' => 'full_label','option-value' => 'name','searchable' => true,'wire:key' => 'dest-'.e($destination_province ?? 'scope-' . $travel_type).'']); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>

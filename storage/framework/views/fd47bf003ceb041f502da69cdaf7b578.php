@@ -1,5 +1,6 @@
 <?php
 use App\Models\StationOfficer;
+use App\Models\User;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -86,6 +87,7 @@ use WireUi\Traits\WireUiActions;
                     <th class="p-4">Officer Name</th>
                     <th class="p-4">Suffix</th>
                     <th class="p-4">Position</th>
+                    <th class="p-4">Linked User</th>
                     <th class="p-4 text-center">Actions</th>
                 </tr>
             </thead>
@@ -96,6 +98,13 @@ use WireUi\Traits\WireUiActions;
                         <td class="p-4"><?php echo e($officer->officer_name); ?></td>
                         <td class="p-4"><?php echo e($officer->academic_suffix ?: '—'); ?></td>
                         <td class="p-4"><?php echo e($officer->position); ?></td>
+                        <td class="p-4">
+                            <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($officer->user): ?>
+                                <span class="badge badge-success badge-sm"><?php echo e($officer->user->fullName); ?></span>
+                            <?php else: ?>
+                                <span class="text-xs opacity-40">—</span>
+                            <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
+                        </td>
                         <td class="p-4 flex justify-center gap-2">
                             <?php if (isset($component)) { $__componentOriginalf04362c37f55b087f96f1c4fb07d5ce1 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalf04362c37f55b087f96f1c4fb07d5ce1 = $attributes; } ?>
@@ -145,7 +154,7 @@ use WireUi\Traits\WireUiActions;
                     </tr>
                 <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::endLoop(); ?><?php endif; ?><?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::closeLoop(); ?><?php endif; ?>
                     <tr>
-                        <td colspan="5" class="p-8 text-center opacity-50">No station officers found.</td>
+                        <td colspan="6" class="p-8 text-center opacity-50">No station officers found.</td>
                     </tr>
                 <?php endif; ?><?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if ENDBLOCK]><![endif]--><?php endif; ?>
             </tbody>
@@ -176,7 +185,7 @@ use WireUi\Traits\WireUiActions;
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\WireUi\Components\TextField\Input::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['label' => 'Station Code','wire:model' => 'station_code','placeholder' => 'e.g. DARMO-Nabunturan']); ?>
+<?php $component->withAttributes(['label' => 'Station Code','wire:model.live' => 'station_code','placeholder' => 'e.g. DARMO-Nabunturan']); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>
@@ -189,6 +198,30 @@ use WireUi\Traits\WireUiActions;
 <?php $component = $__componentOriginal125559500674abc14ca4c750a63c3764; ?>
 <?php unset($__componentOriginal125559500674abc14ca4c750a63c3764); ?>
 <?php endif; ?>
+
+            <?php if (isset($component)) { $__componentOriginal49b3de13d927faa5a3ecd49fc0b06061 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal49b3de13d927faa5a3ecd49fc0b06061 = $attributes; } ?>
+<?php $component = WireUi\Components\Select\Base::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('select'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\WireUi\Components\Select\Base::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['label' => 'Assigned Officer','placeholder' => 'Select user...','wire:model.live' => 'user_id','options' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($this->eligibleUsers),'option-label' => 'name','option-value' => 'id','searchable' => true]); ?>
+<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
+
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal49b3de13d927faa5a3ecd49fc0b06061)): ?>
+<?php $attributes = $__attributesOriginal49b3de13d927faa5a3ecd49fc0b06061; ?>
+<?php unset($__attributesOriginal49b3de13d927faa5a3ecd49fc0b06061); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal49b3de13d927faa5a3ecd49fc0b06061)): ?>
+<?php $component = $__componentOriginal49b3de13d927faa5a3ecd49fc0b06061; ?>
+<?php unset($__componentOriginal49b3de13d927faa5a3ecd49fc0b06061); ?>
+<?php endif; ?>
+
             <?php if (isset($component)) { $__componentOriginal125559500674abc14ca4c750a63c3764 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal125559500674abc14ca4c750a63c3764 = $attributes; } ?>
 <?php $component = WireUi\Components\TextField\Input::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
@@ -198,7 +231,7 @@ use WireUi\Traits\WireUiActions;
 <?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
 <?php $attributes = $attributes->except(\WireUi\Components\TextField\Input::ignoredParameterNames()); ?>
 <?php endif; ?>
-<?php $component->withAttributes(['label' => 'Officer Name','wire:model' => 'officer_name','placeholder' => 'e.g. Juan Dela Cruz']); ?>
+<?php $component->withAttributes(['label' => 'Officer Name','wire:model' => 'officer_name','placeholder' => 'Auto-filled from selected user']); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>
@@ -221,28 +254,6 @@ use WireUi\Traits\WireUiActions;
 <?php $attributes = $attributes->except(\WireUi\Components\TextField\Input::ignoredParameterNames()); ?>
 <?php endif; ?>
 <?php $component->withAttributes(['label' => 'Academic Suffix (optional)','wire:model' => 'academic_suffix','placeholder' => 'e.g. MPA, MDMG, MExEd']); ?>
-<?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
-
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal125559500674abc14ca4c750a63c3764)): ?>
-<?php $attributes = $__attributesOriginal125559500674abc14ca4c750a63c3764; ?>
-<?php unset($__attributesOriginal125559500674abc14ca4c750a63c3764); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal125559500674abc14ca4c750a63c3764)): ?>
-<?php $component = $__componentOriginal125559500674abc14ca4c750a63c3764; ?>
-<?php unset($__componentOriginal125559500674abc14ca4c750a63c3764); ?>
-<?php endif; ?>
-            <?php if (isset($component)) { $__componentOriginal125559500674abc14ca4c750a63c3764 = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal125559500674abc14ca4c750a63c3764 = $attributes; } ?>
-<?php $component = WireUi\Components\TextField\Input::resolve([] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('input'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\WireUi\Components\TextField\Input::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['label' => 'Position','wire:model' => 'position','placeholder' => 'e.g. MARPO']); ?>
 <?php \Livewire\Features\SupportCompiledWireKeys\SupportCompiledWireKeys::processComponentKey($component); ?>
 
 <?php echo $__env->renderComponent(); ?>

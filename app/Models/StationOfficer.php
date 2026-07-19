@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StationOfficer extends Model
 {
@@ -14,10 +15,16 @@ class StationOfficer extends Model
         'officer_name',
         'academic_suffix',
         'position',
+        'user_id',
     ];
 
     public function scopeOrdered($query)
     {
         return $query->orderBy('station_code');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

@@ -14,7 +14,7 @@
                 {{-- Header Section --}}
                 <div class="flex justify-between items-center border-b-2 border-gray-900 pb-6 mb-8">
                     <img src="{{ asset('images/dar-logo.png') }}" class="w-20">
-                    <div class="text-center">
+                    <div class="text-center leading-[1.15]">
                         <p class="text-sm">Republic of the Philippines</p>
                         <h1 class="font-bold text-xl uppercase">Department of Agrarian Reform</h1>
                         <p class="text-md font-semibold">Provincial Agrarian Reform Office</p>

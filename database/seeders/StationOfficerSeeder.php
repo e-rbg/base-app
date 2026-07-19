@@ -37,8 +37,16 @@ class StationOfficerSeeder extends Seeder
                 $officer
             );
 
-            [$firstName, $lastName] = $this->parseNames($officer['officer_name']);
+            [$firstName, $middleName, $lastName] = $this->parseNames($officer['officer_name']);
             $username = strtolower($firstName);
+
+            // Ensure unique username by appending a suffix if taken
+            $base = $username;
+            $suffix = 1;
+            while (User::where('username', $username)->exists()) {
+                $username = $base . $suffix;
+                $suffix++;
+            }
 
             $user = User::updateOrCreate(
                 ['username' => $username],
@@ -54,12 +62,27 @@ class StationOfficerSeeder extends Seeder
                 ['user_id' => $user->id],
                 [
                     'first_name' => $firstName,
+                    'middle_name' => $middleName,
                     'last_name' => $lastName,
                     'academic_suffix' => $officer['academic_suffix'] ?? null,
                     'position' => $officer['position'],
                     'area_of_assignment' => $officer['station_code'],
                 ]
             );
+
+            // Link station officer to user and sync name
+            $stationOfficer = StationOfficer::where('station_code', $officer['station_code'])->first();
+            if ($stationOfficer) {
+                $constructedName = $firstName
+                    . ($middleName ? ' ' . $middleName : '')
+                    . ' ' . $lastName;
+
+                $stationOfficer->update([
+                    'user_id' => $user->id,
+                    'officer_name' => $constructedName,
+                    'academic_suffix' => $officer['academic_suffix'] ?? null,
+                ]);
+            }
         }
     }
 
@@ -70,7 +93,10 @@ class StationOfficerSeeder extends Seeder
 
         $firstName = $parts[0] ?? $name;
         $lastName = $parts[count($parts) - 1] ?? $firstName;
+        $middleName = count($parts) > 2
+            ? implode(' ', array_slice($parts, 1, -1))
+            : null;
 
-        return [$firstName, $lastName];
+        return [$firstName, $middleName, $lastName];
     }
 }

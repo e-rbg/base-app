@@ -26,6 +26,7 @@
             @media print {
                 html, body { margin: 0; padding: 0; }
             }
+            html, body { font-family: Calibri, Roboto, ui-sans-serif, system-ui, sans-serif; }
         </style>
     </head>
     <body class="bg-base-100 antialiased">

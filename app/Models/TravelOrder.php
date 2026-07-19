@@ -92,6 +92,35 @@ class TravelOrder extends Model
     }
 
     /**
+     * Generate a QR code encoding the public verification URL.
+     * When scanned, opens a page showing the travel order details and authenticity.
+     */
+    public function generateDocumentQrCode(): ?string
+    {
+        $data = route('verify.travel-order', $this);
+
+        $renderer = new GDLibRenderer(300);
+        $writer = new Writer($renderer);
+        $pngData = $writer->writeString(
+            $data,
+            Encoder::DEFAULT_BYTE_MODE_ENCODING,
+            ErrorCorrectionLevel::H()
+        );
+
+        $resource = imagecreatefromstring($pngData);
+        if ($resource === false) {
+            return 'data:image/png;base64,' . base64_encode($pngData);
+        }
+
+        ob_start();
+        imagepng($resource);
+        $finalPng = ob_get_clean();
+        imagedestroy($resource);
+
+        return 'data:image/png;base64,' . base64_encode($finalPng);
+    }
+
+    /**
      * Generate QR code PNG from a raw esignature hash string.
      * Used for displaying the approver's/recommender's QR on documents.
      */

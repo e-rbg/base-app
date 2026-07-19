@@ -9,6 +9,7 @@
         @media print {
             html, body { margin: 0; padding: 0; }
         }
+        html, body { font-family: Calibri, Roboto, ui-sans-serif, system-ui, sans-serif; }
     </style>
 </head>
 <body class="bg-white antialiased">
@@ -21,9 +22,9 @@
             @else
                 <div class="flex h-16 w-16 items-center justify-center border text-[8px]">DAR LOGO</div>
             @endif
-            <div class="text-center">
+            <div class="text-center leading-[1.15]">
                 <p class="m-0 text-[10px] uppercase tracking-widest">Republic of the Philippines</p>
-                <h1 class="m-0 font-serif text-xl font-bold uppercase">Department of Agrarian Reform</h1>
+                <h1 class="m-0 text-xl font-bold uppercase">Department of Agrarian Reform</h1>
                 <p class="m-0 text-sm font-semibold">Provincial Agrarian Reform Office</p>
                 <p class="m-0 text-xs">Davao de Oro</p>
             </div>
@@ -35,9 +36,18 @@
         </div>
 
         {{-- Title --}}
-        <div class="my-8 text-center">
-            <h2 class="font-serif text-3xl font-black">TRAVEL ORDER</h2>
-            <p class="mt-1 font-mono">No. <span class="underline">{{ $order->travel_order_no }}</span></p>
+        <div class="my-8 flex items-center justify-center gap-6">
+            @php $docQr = $order->generateDocumentQrCode(); @endphp
+            @if($docQr)
+                <div class="flex flex-col items-center flex-shrink-0">
+                    <img src="{{ $docQr }}" alt="Document QR" width="70" height="70" />
+                    <p class="text-[6px] font-mono mt-0.5 text-gray-400">Scan to verify</p>
+                </div>
+            @endif
+            <div class="text-center">
+                <h2 class="text-3xl font-black">TRAVEL ORDER</h2>
+                <p class="mt-1 font-mono">No. <span class="underline">{{ $order->travel_order_no }}</span></p>
+            </div>
         </div>
 
         {{-- Personnel Info --}}
@@ -131,6 +141,14 @@
             @if($order->travel_type !== 'intra_municipal' && !empty($order->recommending_approval) && $order->recommending_approval !== 'N/A')
             <div>
                 <p class="mb-5 text-left text-[9px] font-bold uppercase text-gray-400">Recommending Approval:</p>
+                @if($order->recommending_approved_at && $order->esignature_recommender_hash)
+                    <div class="mb-2 flex flex-col justify-center items-center">
+                        @if($qrCode = \App\Models\TravelOrder::generateQrFromHash($order->esignature_recommender_hash))
+                            <img src="{{ $qrCode }}" alt="E-signature QR code" width="100" height="100" />
+                        @endif
+                        <p class="font-mono text-[8px] tracking-tight leading-none mt-1">{{ $order->esignature_recommender_hash }}</p>
+                    </div>
+                @endif
                 <p class="border-b-2 border-black font-bold uppercase">{{ $order->recommending_approval }}</p>
                 @if($order->recommending_position)
                     <p class="text-xs italic">{{ $order->recommending_position }}</p>
@@ -140,7 +158,7 @@
             <div>
                 <p class="mb-5 text-left text-[9px] font-bold uppercase text-gray-400">Approved By:</p>
                 @if($order->status === 'approved' && $order->esignature_hash)
-                    <div class="mb-2 w-1/4 flex flex-col justify-center items-center">
+                    <div class="mb-2 flex flex-col justify-center items-center">
                         @if($qrCode = \App\Models\TravelOrder::generateQrFromHash($order->esignature_hash))
                             <img src="{{ $qrCode }}" alt="E-signature QR code" width="100" height="100" />
                         @endif
@@ -150,6 +168,13 @@
                 <p class="border-b-2 border-black font-bold uppercase">{{ $order->approved_by_name }}</p>
                 <p class="text-xs italic">{{ $order->approved_by_position }}</p>
             </div>
+        </div>
+
+        {{-- Document QR Text --}}
+        <div class="mt-8 pt-4 border-t border-gray-200">
+            <p class="text-[8px] font-mono text-gray-400 text-center break-all">
+                Verify this document: {{ route('verify.travel-order', $order) }}
+            </p>
         </div>
     </div>
 </body>

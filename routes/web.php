@@ -10,6 +10,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// --- PUBLIC DOCUMENT VERIFICATION ---
+Route::get('/verify/{travelOrder}', function (App\Models\TravelOrder $travelOrder) {
+    return view('verify.travel-order', compact('travelOrder'));
+})->name('verify.travel-order');
+
 // --- AUTHENTICATED ADMIN AREA ---
 Route::middleware(['auth', 'verified'])
     ->prefix('admin')

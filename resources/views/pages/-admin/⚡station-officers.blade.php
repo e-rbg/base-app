@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\StationOfficer;
+use App\Models\User;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -19,7 +20,7 @@ new #[Layout('layouts.app')]
     public string $station_code = '';
     public string $officer_name = '';
     public ?string $academic_suffix = null;
-    public string $position = '';
+    public ?string $user_id = null;
 
     public function updatingSearch()
     {
@@ -30,6 +31,7 @@ new #[Layout('layouts.app')]
     public function officers()
     {
         return StationOfficer::query()
+            ->with('user.profile')
             ->when($this->search, fn($q) => $q->where('station_code', 'like', "%{$this->search}%")
                 ->orWhere('officer_name', 'like', "%{$this->search}%")
                 ->orWhere('academic_suffix', 'like', "%{$this->search}%"))
@@ -37,9 +39,63 @@ new #[Layout('layouts.app')]
             ->paginate(15);
     }
 
+    #[\Livewire\Attributes\Computed]
+    public function eligibleUsers(): array
+    {
+        if (!$this->station_code) {
+            return [];
+        }
+
+        return User::query()
+            ->where(function ($q) {
+                // Match by station assignment
+                $q->whereHas('profile', function ($q) {
+                    $q->where('area_of_assignment', $this->station_code);
+                });
+
+                // Also include users with MARPO-related position (for DARMO stations)
+                if (str_starts_with($this->station_code, 'DARMO-')) {
+                    $q->orWhereHas('profile', function ($q) {
+                        $q->where('position', 'like', '%MARPO%');
+                    });
+                }
+
+                // Include users with OIC MARPO designation from EmployeeInformation
+                $q->orWhereHas('profile.employeeInformation', function ($q) {
+                    $q->where('designation', 'like', '%OIC MARPO%');
+                });
+            })
+            ->with('profile.employeeInformation')
+            ->get()
+            ->map(fn($u) => [
+                'id'   => $u->id,
+                'name' => $u->fullName
+                    . ($u->profile?->position ? ' — ' . $u->profile->position : '')
+                    . ($u->profile?->employeeInformation?->designation ? ' (' . $u->profile->employeeInformation->designation . ')' : ''),
+            ])
+            ->sortBy('name')
+            ->values()
+            ->toArray();
+    }
+
+    public function updatedUserId($value)
+    {
+        if (!$value) {
+            return;
+        }
+
+        $user = User::with('profile')->find($value);
+        if ($user && $user->profile) {
+            $this->officer_name = $user->profile->first_name
+                . ($user->profile->middle_name ? ' ' . $user->profile->middle_name : '')
+                . ' ' . $user->profile->last_name;
+            $this->academic_suffix = $user->profile->academic_suffix ?? null;
+        }
+    }
+
     public function create()
     {
-        $this->reset(['station_code', 'officer_name', 'academic_suffix', 'position']);
+        $this->reset(['station_code', 'officer_name', 'academic_suffix', 'user_id']);
         $this->editing = null;
         $this->modal = true;
     }
@@ -50,7 +106,7 @@ new #[Layout('layouts.app')]
         $this->station_code = $officer->station_code;
         $this->officer_name = $officer->officer_name;
         $this->academic_suffix = $officer->academic_suffix;
-        $this->position = $officer->position;
+        $this->user_id = $officer->user_id;
         $this->modal = true;
     }
 
@@ -60,8 +116,10 @@ new #[Layout('layouts.app')]
             'station_code'     => 'required|string|max:255',
             'officer_name'     => 'required|string|max:255',
             'academic_suffix'  => 'nullable|string|max:255',
-            'position'         => 'required|string|max:255',
+            'user_id'          => 'nullable|exists:users,id',
         ]);
+
+        $position = $this->resolvePosition();
 
         StationOfficer::updateOrCreate(
             ['id' => $this->editing?->id],
@@ -69,7 +127,8 @@ new #[Layout('layouts.app')]
                 'station_code'     => $this->station_code,
                 'officer_name'     => $this->officer_name,
                 'academic_suffix'  => $this->academic_suffix ?: null,
-                'position'         => $this->position,
+                'position'         => $position,
+                'user_id'          => $this->user_id ?: null,
             ]
         );
 
@@ -79,8 +138,24 @@ new #[Layout('layouts.app')]
         );
 
         $this->modal = false;
-        $this->reset(['station_code', 'officer_name', 'academic_suffix', 'position']);
+        $this->reset(['station_code', 'officer_name', 'academic_suffix', 'user_id']);
         $this->editing = null;
+    }
+
+    private function resolvePosition(): string
+    {
+        if ($this->user_id) {
+            $user = User::with('profile.employeeInformation')->find($this->user_id);
+
+            if ($user?->profile) {
+                // Use profile position first, fall back to employee designation
+                return $user->profile->position
+                    ?? $user->profile->employeeInformation?->designation
+                    ?? 'Unknown';
+            }
+        }
+
+        return $this->officer_name ? 'Unknown' : '';
     }
 
     public function delete(StationOfficer $officer)
@@ -134,6 +209,7 @@ new #[Layout('layouts.app')]
                     <th class="p-4">Officer Name</th>
                     <th class="p-4">Suffix</th>
                     <th class="p-4">Position</th>
+                    <th class="p-4">Linked User</th>
                     <th class="p-4 text-center">Actions</th>
                 </tr>
             </thead>
@@ -144,6 +220,13 @@ new #[Layout('layouts.app')]
                         <td class="p-4">{{ $officer->officer_name }}</td>
                         <td class="p-4">{{ $officer->academic_suffix ?: '—' }}</td>
                         <td class="p-4">{{ $officer->position }}</td>
+                        <td class="p-4">
+                            @if($officer->user)
+                                <span class="badge badge-success badge-sm">{{ $officer->user->fullName }}</span>
+                            @else
+                                <span class="text-xs opacity-40">—</span>
+                            @endif
+                        </td>
                         <td class="p-4 flex justify-center gap-2">
                             <x-button rounded icon="pencil" wire:click="edit('{{ $officer->id }}')" />
                             <x-button rounded negative icon="trash"
@@ -153,7 +236,7 @@ new #[Layout('layouts.app')]
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="p-8 text-center opacity-50">No station officers found.</td>
+                        <td colspan="6" class="p-8 text-center opacity-50">No station officers found.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -164,10 +247,13 @@ new #[Layout('layouts.app')]
     {{-- Modal --}}
     <x-modal-card title="{{ $editing ? 'Edit' : 'Add' }} Station Officer" wire:model="modal">
         <div class="space-y-4">
-            <x-input label="Station Code" wire:model="station_code" placeholder="e.g. DARMO-Nabunturan" />
-            <x-input label="Officer Name" wire:model="officer_name" placeholder="e.g. Juan Dela Cruz" />
+            <x-input label="Station Code" wire:model.live="station_code" placeholder="e.g. DARMO-Nabunturan" />
+
+            <x-select label="Assigned Officer" placeholder="Select user..." wire:model.live="user_id"
+                :options="$this->eligibleUsers" option-label="name" option-value="id" searchable />
+
+            <x-input label="Officer Name" wire:model="officer_name" placeholder="Auto-filled from selected user" />
             <x-input label="Academic Suffix (optional)" wire:model="academic_suffix" placeholder="e.g. MPA, MDMG, MExEd" />
-            <x-input label="Position" wire:model="position" placeholder="e.g. MARPO" />
         </div>
 
         <x-slot name="footer">
