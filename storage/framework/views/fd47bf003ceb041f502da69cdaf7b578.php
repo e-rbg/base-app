@@ -1,6 +1,8 @@
 <?php
 use App\Models\StationOfficer;
+use App\Models\OfficialStation;
 use App\Models\User;
+use App\Helpers\PositionHelper;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -97,7 +99,15 @@ use WireUi\Traits\WireUiActions;
                         <td class="p-4 font-bold"><?php echo e($officer->station_code); ?></td>
                         <td class="p-4"><?php echo e($officer->officer_name); ?></td>
                         <td class="p-4"><?php echo e($officer->academic_suffix ?: '—'); ?></td>
-                        <td class="p-4"><?php echo e($officer->position); ?></td>
+                        <td class="p-4">
+                            <?php
+                                $ei = $officer->user?->profile?->employeeInformation;
+                                $pos = PositionHelper::toAcronym($ei?->position ?? $officer->position ?? '');
+                                $desig = $ei?->designation ? PositionHelper::toAcronym($ei->designation) : '';
+                            ?>
+                            <?php echo e($desig ? "{$pos}/{$desig}" : ($pos ?: '—')); ?>
+
+                        </td>
                         <td class="p-4">
                             <?php if(\Livewire\Mechanisms\ExtendBlade\ExtendBlade::isRenderingLivewireComponent()): ?><!--[if BLOCK]><![endif]--><?php endif; ?><?php if($officer->user): ?>
                                 <span class="badge badge-success badge-sm"><?php echo e($officer->user->fullName); ?></span>

@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\StationOfficer;
+use App\Models\OfficialStation;
 use App\Models\User;
+use App\Helpers\PositionHelper;
 use Livewire\Component;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -219,7 +221,14 @@ new #[Layout('layouts.app')]
                         <td class="p-4 font-bold">{{ $officer->station_code }}</td>
                         <td class="p-4">{{ $officer->officer_name }}</td>
                         <td class="p-4">{{ $officer->academic_suffix ?: '—' }}</td>
-                        <td class="p-4">{{ $officer->position }}</td>
+                        <td class="p-4">
+                            @php
+                                $ei = $officer->user?->profile?->employeeInformation;
+                                $pos = PositionHelper::toAcronym($ei?->position ?? $officer->position ?? '');
+                                $desig = $ei?->designation ? PositionHelper::toAcronym($ei->designation) : '';
+                            @endphp
+                            {{ $desig ? "{$pos}/{$desig}" : ($pos ?: '—') }}
+                        </td>
                         <td class="p-4">
                             @if($officer->user)
                                 <span class="badge badge-success badge-sm">{{ $officer->user->fullName }}</span>
